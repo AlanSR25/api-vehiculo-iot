@@ -5,10 +5,10 @@
 
 export const CONFIG = {
   // URL base HTTPS con certificado SSL oficial de confianza mundial (Cloudflare)
-  API_BASE_URL: "https://mitsubishi-equal-waiver-operated.trycloudflare.com",
+  API_BASE_URL: "https://bath-sunrise-stomach-grown.trycloudflare.com",
 
   // URL WebSocket WSS segura
-  WS_URL: "wss://mitsubishi-equal-waiver-operated.trycloudflare.com/ws/vehiculo/1",
+  WS_URL: "wss://bath-sunrise-stomach-grown.trycloudflare.com/ws/vehiculo/1",
 
   // ID del vehículo asignado para la práctica
   VEHICLE_ID: 1,
