@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Control IoT · Vehículo Excavadora</title>
+  
+  <!-- Favicon funcional compatible con GitHub Pages -->
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+  
+  <!-- Bootstrap 5 CSS y Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  
+  <!-- Estilos propios -->
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+
+  <!-- Barra de Encabezado -->
+  <header class="py-2 px-3 border-bottom border-secondary-subtle bg-dark">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <img src="assets/icons/favicon.svg" alt="IoT Logo" width="28" height="28" />
+        <div>
+          <h1 class="h6 mb-0 text-white fw-bold" id="vehiculoNombre">Excavadora IoT</h1>
+          <small class="text-secondary" id="vehiculoModelo">ESP32 DevKit V1 · AWS EC2</small>
+        </div>
+      </div>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+        <i class="bi bi-cpu"></i> Vehículo #1
+      </span>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal (Mobile First) -->
+  <main class="container my-3 flex-grow-1">
+    
+    <!-- PANEL DE 3 INDICADORES OBLIGATORIOS -->
+    <section class="glass-card p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-secondary small fw-semibold text-uppercase tracking-wider">
+          <i class="bi bi-shield-check"></i> Conectividad y Salud
+        </span>
+        <small class="text-secondary fst-italic">Verificación en vivo</small>
+      </div>
+
+      <div class="row g-2">
+        <!-- 1. WebSocket WSS -->
+        <div class="col-12 col-md-4">
+          <div class="status-indicator d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-activity text-info me-1"></i> WebSocket WSS:</span>
+            <span id="wsStatusBadge" class="badge bg-secondary">
+              <i class="bi bi-hourglass-split"></i> Conectando...
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. Servidor AWS API 21 Servicios -->
+        <div class="col-12 col-md-4">
+          <div class="status-indicator d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-hdd-network text-warning me-1"></i> API AWS (EC2):</span>
+            <span id="apiStatusBadge" class="badge bg-secondary">
+              <i class="bi bi-hourglass-split"></i> Comprobando
+            </span>
+          </div>
+        </div>
+
+        <!-- 3. Base de Datos Amazon RDS -->
+        <div class="col-12 col-md-4">
+          <div class="status-indicator d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-database text-success me-1"></i> Amazon RDS:</span>
+            <span id="rdsStatusBadge" class="badge bg-secondary">
+              <i class="bi bi-question-circle"></i> Sin verificar
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ÁREA DE OPERACIÓN: JOYSTICK + ACCIONES -->
+    <div class="row g-3">
+      
+      <!-- Columna 1: Joystick Circular Virtual y Detención Prioritaria -->
+      <div class="col-12 col-lg-6">
+        <section class="glass-card p-3 text-center h-100 d-flex flex-direction-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-secondary small fw-semibold text-uppercase">
+                <i class="bi bi-controller"></i> Joystick Táctil
+              </span>
+              <span class="badge bg-dark border border-secondary" id="joystickDirectionText">NEUTRAL</span>
+            </div>
+            
+            <div class="joystick-zone py-2">
+              <div class="joystick-base" id="joystickContainer" aria-label="Joystick de Navegación">
+                <div class="joystick-crosshair"></div>
+                <div class="joystick-stick"></div>
+              </div>
+            </div>
+            <p class="text-secondary small mb-3">Arrastra para mover el vehículo. Al soltar se frenará automáticamente.</p>
+          </div>
+
+          <!-- BOTÓN DETENER PRIORITARIO -->
+          <div class="w-100">
+            <button id="btnDetener" class="btn btn-stop-priority w-100 d-flex align-items-center justify-content-center gap-2">
+              <i class="bi bi-slash-circle-fill fs-5"></i> DETENER TODO (9)
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Columna 2: Controles Táctiles Adicionales y DEMO -->
+      <div class="col-12 col-lg-6 d-flex flex-column gap-3">
+        
+        <!-- Accesorios (Brazo, Luz y Grabación en RAM) -->
+        <section class="glass-card p-3">
+          <span class="text-secondary small fw-semibold text-uppercase d-block mb-2">
+            <i class="bi bi-sliders"></i> Controles del Vehículo
+          </span>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <button id="btnSubir" class="btn btn-outline-info btn-control-touch w-100">
+                <i class="bi bi-arrow-up-circle"></i> Subir Brazo (5)
+              </button>
+            </div>
+            <div class="col-6">
+              <button id="btnBajar" class="btn btn-outline-info btn-control-touch w-100">
+                <i class="bi bi-arrow-down-circle"></i> Bajar Brazo (6)
+              </button>
+            </div>
+            <div class="col-6">
+              <button id="btnLuz" class="btn btn-outline-warning btn-control-touch w-100">
+                <i class="bi bi-lightbulb"></i> Luz On/Off (7)
+              </button>
+            </div>
+            <div class="col-6">
+              <button id="btnGrabar" class="btn btn-outline-success btn-control-touch w-100">
+                <i class="bi bi-record-circle"></i> Grabar/Play (8)
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Selector y Ejecución de DEMO existente -->
+        <section class="glass-card p-3">
+          <span class="text-secondary small fw-semibold text-uppercase d-block mb-2">
+            <i class="bi bi-play-circle"></i> Secuencia DEMO (RDS)
+          </span>
+
+          <div class="input-group mb-2">
+            <label class="input-group-text bg-dark border-secondary text-secondary" for="selectDemo">
+              <i class="bi bi-list-stars"></i>
+            </label>
+            <select class="form-select bg-dark border-secondary text-white" id="selectDemo">
+              <option value="1">Cargando DEMOs...</option>
+            </select>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button id="btnIniciarDemo" class="btn btn-primary btn-control-touch flex-grow-1">
+              <i class="bi bi-play-fill"></i> Iniciar DEMO
+            </button>
+            <button id="btnCancelarDemo" class="btn btn-outline-danger btn-control-touch" disabled>
+              <i class="bi bi-x-circle"></i> Cancelar
+            </button>
+          </div>
+
+          <div id="demoStatusCard" class="card bg-dark border-info mt-2 p-2 d-none">
+            <div class="d-flex align-items-center gap-2">
+              <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+              <small class="text-info" id="demoStepText">Secuencia en proceso...</small>
+            </div>
+          </div>
+        </section>
+
+        <!-- Trazabilidad de Respuesta (Solicitado / Aceptado / Evento WSS) -->
+        <section class="glass-card p-3">
+          <span class="text-secondary small fw-semibold text-uppercase d-block mb-2">
+            <i class="bi bi-terminal"></i> Evidencia Operativa
+          </span>
+          <div class="small">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-secondary">Solicitud:</span>
+              <span class="text-white fw-bold" id="logSolicitud">Ninguna</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-secondary">HTTP API:</span>
+              <span class="text-info" id="logHttp">-</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Evento WSS:</span>
+              <span id="logWs" class="badge bg-secondary">-</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer con Créditos Obligatorios -->
+  <footer>
+    <div class="container text-center">
+      <p class="mb-0">
+        Desarrollado por <strong class="text-white">Alan Yahir Flores Gonzalez</strong> · 2026
+      </p>
+      <small class="text-secondary">Implementación de Soluciones IoT · Amazon EC2 & RDS · GitHub Pages</small>
+    </div>
+  </footer>
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Aplicación Modular ES6+ -->
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
+

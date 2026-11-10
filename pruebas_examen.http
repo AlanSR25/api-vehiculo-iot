@@ -1,0 +1,196 @@
+### =========================================================================
+### 2.6 EXAMEN TEMA 2 - COLECCIÓN DE PRUEBAS HTTP Y WEBSOCKET
+### Host público en Amazon EC2: https://44.194.225.196:8000
+### =========================================================================
+
+@baseUrl = https://44.194.225.196:8000
+@vehiculoId = 1
+@comandoId = 1
+@demoId = 1
+
+### -------------------------------------------------------------------------
+### DIAGNÓSTICO
+### -------------------------------------------------------------------------
+
+### 0.1 Comprobar salud de la API y de Amazon RDS MySQL
+GET {{baseUrl}}/health
+
+### 0.2 Documentación Swagger
+GET {{baseUrl}}/docs
+
+
+### =========================================================================
+### 1. VEHÍCULOS (5 SP)
+### =========================================================================
+
+### SP 1: sp_crear_vehiculo
+POST {{baseUrl}}/vehiculos
+Content-Type: application/json
+
+{
+  "nombre": "Vehículo Explorador IoT",
+  "modelo": "Rover 2026",
+  "descripcion": "Vehículo de exploración con ESP32",
+  "microcontrolador": "ESP32"
+}
+
+### SP 2: sp_obtener_vehiculos
+GET {{baseUrl}}/vehiculos
+
+### SP 3: sp_obtener_vehiculo
+GET {{baseUrl}}/vehiculos/{{vehiculoId}}
+
+### SP 4: sp_actualizar_vehiculo
+PUT {{baseUrl}}/vehiculos/{{vehiculoId}}
+Content-Type: application/json
+
+{
+  "nombre": "Excavadora IoT Modificada",
+  "modelo": "Modelo X-Pro",
+  "descripcion": "Vehículo de construcción controlado por ESP8266 actualizado",
+  "microcontrolador": "ESP8266",
+  "activo": true
+}
+
+### SP 5: sp_eliminar_vehiculo (Cuidado: borra en cascada)
+# DELETE {{baseUrl}}/vehiculos/2
+
+
+### =========================================================================
+### 2. COMANDOS (4 SP)
+### =========================================================================
+
+### SP 6: sp_crear_comando
+POST {{baseUrl}}/comandos
+Content-Type: application/json
+
+{
+  "id_vehiculo": {{vehiculoId}},
+  "nombre": "ENCENDER_LUCES",
+  "codigo": 15,
+  "descripcion": "Enciende los faros LED frontales"
+}
+
+### SP 7: sp_obtener_comandos_vehiculo
+GET {{baseUrl}}/comandos/vehiculo/{{vehiculoId}}
+
+### SP 8: sp_actualizar_comando
+PUT {{baseUrl}}/comandos/1
+Content-Type: application/json
+
+{
+  "nombre": "AVANZAR_RAPIDO",
+  "codigo": 1,
+  "descripcion": "Avanza hacia adelante a velocidad máxima",
+  "activo": true
+}
+
+### SP 9: sp_eliminar_comando
+# DELETE {{baseUrl}}/comandos/15
+
+
+### =========================================================================
+### 3. ESTADO DEL VEHÍCULO (2 SP) Y MOVIMIENTO EN TIEMPO REAL
+### =========================================================================
+
+### SP 11: sp_obtener_estado
+GET {{baseUrl}}/vehiculos/{{vehiculoId}}/estado
+
+### SP 10: sp_actualizar_estado (Actualización directa)
+PUT {{baseUrl}}/vehiculos/{{vehiculoId}}/estado
+Content-Type: application/json
+
+{
+  "id_comando": 9,
+  "conectado": true
+}
+
+### MOVIMIENTO INDIVIDUAL (Ejecuta SP 10 + SP 12 en Transacción y emite por WSS)
+### [ESCENARIO 1 DEL EXAMEN - EVIDENCIA 3]
+POST {{baseUrl}}/vehiculos/{{vehiculoId}}/movimiento
+Content-Type: application/json
+
+{
+  "id_comando": 1,
+  "origen": "THUNDER-CLIENT"
+}
+
+
+### =========================================================================
+### 4. HISTORIAL DE COMANDOS (2 SP)
+### =========================================================================
+
+### SP 13: sp_obtener_historial (Máx 10 movimientos recientes desc)
+### [ESCENARIO 2 DEL EXAMEN - EVIDENCIA 4]
+GET {{baseUrl}}/vehiculos/{{vehiculoId}}/historial
+
+
+### =========================================================================
+### 5. DEMOS (4 SP) Y CONTROL DE EJECUCIÓN
+### =========================================================================
+
+### SP 14: sp_crear_demo
+POST {{baseUrl}}/demos
+Content-Type: application/json
+
+{
+  "id_vehiculo": {{vehiculoId}},
+  "nombre": "Ruta de Patrullaje",
+  "descripcion": "Recorrido automático con escaneo de perímetro"
+}
+
+### SP 15: sp_obtener_demos
+GET {{baseUrl}}/vehiculos/{{vehiculoId}}/demos
+
+### SP 16: sp_actualizar_demo
+PUT {{baseUrl}}/demos/{{demoId}}
+Content-Type: application/json
+
+{
+  "nombre": "Demo Principal Actualizada",
+  "descripcion": "Secuencia automática de 8 pasos del vehículo",
+  "activo": true
+}
+
+### SP 17: sp_eliminar_demo
+# DELETE {{baseUrl}}/demos/2
+
+### INICIAR DEMO TEMPORIZADA (Transmite N movimientos por WSS sin historial)
+### [ESCENARIO 3 DEL EXAMEN - EVIDENCIA 5]
+POST {{baseUrl}}/vehiculos/{{vehiculoId}}/demos/{{demoId}}/iniciar
+
+### CANCELAR DEMO ACTIVA
+POST {{baseUrl}}/vehiculos/{{vehiculoId}}/demos/cancelar
+
+
+### =========================================================================
+### 6. MOVIMIENTOS DE DEMO (4 SP)
+### =========================================================================
+
+### SP 18: sp_agregar_movimiento_demo
+POST {{baseUrl}}/demos/{{demoId}}/movimientos
+Content-Type: application/json
+
+{
+  "id_comando": 1,
+  "orden": 9,
+  "duracion_ms": 1200,
+  "pausa_ms": 300
+}
+
+### SP 19: sp_obtener_movimientos_demo
+GET {{baseUrl}}/demos/{{demoId}}/movimientos
+
+### SP 20: sp_actualizar_movimiento_demo
+PUT {{baseUrl}}/demos/movimientos/1
+Content-Type: application/json
+
+{
+  "id_comando": 1,
+  "orden": 1,
+  "duracion_ms": 2500,
+  "pausa_ms": 500
+}
+
+### SP 21: sp_eliminar_movimiento_demo
+# DELETE {{baseUrl}}/demos/movimientos/9
