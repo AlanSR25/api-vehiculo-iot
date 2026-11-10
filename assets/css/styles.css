@@ -171,3 +171,72 @@ footer {
   to { transform: rotate(360deg); }
 }
 
+/* Navegación por pestañas */
+.nav-pills .nav-link {
+  color: var(--text-muted);
+  border-radius: 0.6rem;
+  transition: all 0.2s ease;
+  min-height: 44px;
+}
+
+.nav-pills .nav-link:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-pills .nav-link.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(2, 132, 199, 0.4);
+}
+
+/* Tarjeta destacada de Monitoreo */
+.monitoreo-card-destacada {
+  background: linear-gradient(145deg, #131b2e 0%, #0d1527 100%);
+  border: 1px solid #1e293b;
+  border-left: 4px solid var(--primary);
+  border-radius: 1rem;
+}
+
+.monitoreo-valor-grande {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+/* Tabla semántica de Monitoreo */
+.tabla-monitoreo-wrap {
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabla-monitoreo {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.tabla-monitoreo thead th {
+  background: #0f172a;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 0.6rem;
+  border-bottom: 1px solid #334155;
+  white-space: nowrap;
+}
+
+.tabla-monitoreo tbody td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid #1e293b;
+  white-space: nowrap;
+}
+
+.tabla-monitoreo tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+

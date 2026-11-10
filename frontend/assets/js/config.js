@@ -18,6 +18,8 @@ export const CONFIG = {
     HEALTH: "/health",
     VEHICULO: (id) => `/vehiculos/${id}`,
     COMANDOS: (id) => `/comandos/vehiculo/${id}`,
+    ESTADO: (id) => `/vehiculos/${id}/estado`,
+    HISTORIAL: (id) => `/vehiculos/${id}/historial`,
     MOVIMIENTO: (id) => `/vehiculos/${id}/movimiento`,
     DEMOS: (id) => `/vehiculos/${id}/demos`,
     INICIAR_DEMO: (idVehiculo, idDemo) => `/vehiculos/${idVehiculo}/demos/${idDemo}/iniciar`,

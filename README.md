@@ -1,121 +1,122 @@
-# API Vehículo IoT - Examen Práctico Tema 2
-
-API REST y WebSocket segura (HTTPS/WSS) desarrollada en Python con FastAPI y Programación Orientada a Objetos, desplegada en **Amazon EC2** y conectada a una base de datos MySQL en **Amazon RDS** (`vehiculo_iot`), consumiendo los **21 procedimientos almacenados** de la arquitectura IoT.
-
----
-
-## Enlaces Públicos
-
-* **Documentación Swagger UI (HTTPS)**: `https://44.194.225.196:8000/docs`
-* **Diagnóstico de Salud (HTTPS)**: `https://44.194.225.196:8000/health`
-* **Canal WebSocket Seguro (WSS)**: `wss://44.194.225.196:8000/ws/vehiculo/{id_vehiculo}`
+# Aplicación Web de Control y Monitoreo IoT en Tiempo Real
+**Práctica 4.1 (Control) & Práctica 4.2 (Monitoreo)**
+**Alumno:** Alan Santiago Rodríguez  
+**Matrícula:** 22200767  
+**Año:** 2026  
+**Repositorio GitHub:** [https://github.com/AlanSR25/api-vehiculo-iot](https://github.com/AlanSR25/api-vehiculo-iot)  
+**Despliegue GitHub Pages:** [https://alansr25.github.io/api-vehiculo-iot/](https://alansr25.github.io/api-vehiculo-iot/)  
 
 ---
 
-## Arquitectura y Tecnologías
+## 1. Enlaces Públicos y Contratos del Sistema
+
+* **Frontend Web (GitHub Pages)**: `https://alansr25.github.io/api-vehiculo-iot/`
+* **Base API HTTPS (Cloudflare Tunnel)**: `https://bath-sunrise-stomach-grown.trycloudflare.com`
+* **Documentación Swagger / OpenAPI**: `https://bath-sunrise-stomach-grown.trycloudflare.com/docs`
+* **Canal WebSocket Seguro (WSS)**: `wss://bath-sunrise-stomach-grown.trycloudflare.com/ws/vehiculo/1`
+* **Diagnóstico de Salud (Health)**: `https://bath-sunrise-stomach-grown.trycloudflare.com/health`
+* **GET Último Estado**: `GET /vehiculos/1/estado`
+* **GET Historial (10 individuales)**: `GET /vehiculos/1/historial`
+* **IP Directa EC2 (Backup)**: `44.194.225.196:8000`
+
+---
+
+## 2. Diagrama de Arquitectura Integral
 
 ```
-[Cliente Remoto / Thunder Client / ESP8266]
-                 │  ▲
-      HTTPS/WSS  │  │  Puerto 8000 (TLS Autofirmado)
-                 ▼  │
-      [Amazon EC2 (Windows Server 2019)]
-           FastAPI + Uvicorn (Daemon persistente)
-                 │  ▲
-       MySQL TCP │  │  Puerto 3306
-                 ▼  │
-      [Amazon RDS for MySQL (vehiculo_iot)]
-           6 Tablas + 21 Stored Procedures
+┌────────────────────────────────────────────────────────────────────────┐
+│                   CLIENTES (Mobile First / Desktop)                     │
+│  - GitHub Pages: https://alansr25.github.io/api-vehiculo-iot/          │
+│  - Vista 1: CONTROL (Joystick táctil PointerEvents, DETENER, DEMO)     │
+│  - Vista 2: MONITOREO (Tarjeta último estado + Tabla 10 movimientos)   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTPS (Fetch REST) / WSS (WebSocket)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│              CLOUDFLARE EDGE & TUNNEL (Certificado TLS Válido)         │
+│  - Endpoint: bath-sunrise-stomach-grown.trycloudflare.com              │
+│  - Sin advertencias SSL en navegadores móviles (iOS / Android)         │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ localhost:8000
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  AMAZON EC2 (Windows Server 2019)                      │
+│  - FastAPI + Uvicorn (Daemon persistente bajo Administrador/SYSTEM)    │
+│  - 21 Servicios REST mapeados a Stored Procedures                      │
+│  - WebSocket Hub bidireccional multicliente (/ws/vehiculo/{id})        │
+│  - CORS Middleware: orígenes abiertos (*) para GitHub Pages            │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ MySQL TCP (Puerto 3306)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  AMAZON RDS for MySQL (vehiculo_iot)                   │
+│  - 6 Tablas relacionales (vehiculos, comandos, estado, historial, etc.) │
+│  - 21 Procedimientos almacenados para aislamiento y seguridad SQL      │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Mapeo de los 21 Procedimientos Almacenados
+## 3. Estructura de Carpetas del Proyecto
 
-| # | Grupo | Procedimiento Almacenado | Método HTTP | Endpoint API | Descripción |
-|---|---|---|---|---|---|
-| 1 | **Vehículos** | `sp_crear_vehiculo` | `POST` | `/vehiculos` | Registra un nuevo vehículo |
-| 2 | **Vehículos** | `sp_obtener_vehiculos` | `GET` | `/vehiculos` | Lista todos los vehículos |
-| 3 | **Vehículos** | `sp_obtener_vehiculo` | `GET` | `/vehiculos/{id_vehiculo}` | Obtiene información de un vehículo |
-| 4 | **Vehículos** | `sp_actualizar_vehiculo` | `PUT` | `/vehiculos/{id_vehiculo}` | Actualiza datos del vehículo |
-| 5 | **Vehículos** | `sp_eliminar_vehiculo` | `DELETE` | `/vehiculos/{id_vehiculo}` | Elimina el vehículo y registros asociados |
-| 6 | **Comandos** | `sp_crear_comando` | `POST` | `/comandos` | Registra un comando para un vehículo |
-| 7 | **Comandos** | `sp_obtener_comandos_vehiculo` | `GET` | `/comandos/vehiculo/{id_vehiculo}` | Lista comandos por vehículo ordenados |
-| 8 | **Comandos** | `sp_actualizar_comando` | `PUT` | `/comandos/{id_comando}` | Modifica un comando existente |
-| 9 | **Comandos** | `sp_eliminar_comando` | `DELETE` | `/comandos/{id_comando}` | Elimina un comando |
-| 10 | **Estado** | `sp_actualizar_estado` | `PUT` | `/vehiculos/{id_vehiculo}/estado` | Actualiza comando actual y conexión |
-| 11 | **Estado** | `sp_obtener_estado` | `GET` | `/vehiculos/{id_vehiculo}/estado` | Consulta el último estado del vehículo |
-| 12 | **Historial** | `sp_registrar_historial` | `POST` | Interno en `/vehiculos/{id}/movimiento` | Registra movimiento individual en historial |
-| 13 | **Historial** | `sp_obtener_historial` | `GET` | `/vehiculos/{id_vehiculo}/historial` | Obtiene máx. 10 movimientos recientes |
-| 14 | **DEMOs** | `sp_crear_demo` | `POST` | `/demos` | Crea una secuencia de demostración |
-| 15 | **DEMOs** | `sp_obtener_demos` | `GET` | `/vehiculos/{id_vehiculo}/demos` | Consulta DEMOs de un vehículo |
-| 16 | **DEMOs** | `sp_actualizar_demo` | `PUT` | `/demos/{id_demo}` | Modifica una DEMO |
-| 17 | **DEMOs** | `sp_eliminar_demo` | `DELETE` | `/demos/{id_demo}` | Elimina una DEMO |
-| 18 | **Movs. DEMO** | `sp_agregar_movimiento_demo` | `POST` | `/demos/{id_demo}/movimientos` | Agrega paso con duración y pausa en ms |
-| 19 | **Movs. DEMO** | `sp_obtener_movimientos_demo`| `GET` | `/demos/{id_demo}/movimientos` | Consulta pasos ordenados por posición |
-| 20 | **Movs. DEMO** | `sp_actualizar_movimiento_demo` | `PUT` | `/demos/movimientos/{id_movimiento}` | Actualiza paso de la DEMO |
-| 21 | **Movs. DEMO** | `sp_eliminar_movimiento_demo` | `DELETE` | `/demos/movimientos/{id_movimiento}` | Elimina un paso de la DEMO |
-
-### Endpoints Especiales de Control
-* `POST /vehiculos/{id_vehiculo}/movimiento`: Ejecuta `sp_actualizar_estado` + `sp_registrar_historial` en una **única transacción atómica** y emite por WSS.
-* `POST /vehiculos/{id_vehiculo}/demos/{id_demo}/iniciar`: Ejecuta la DEMO en segundo plano, transmite N pasos por WSS, actualiza el estado pero **NO registra en historial**.
-* `POST /vehiculos/{id_vehiculo}/demos/cancelar`: Cancela la DEMO activa de inmediato.
+```
+api_vehiculo_iot_ec2/
+├── assets/
+│   ├── css/
+│   │   └── styles.css               # Estilos oscuros Mobile-First, tabs y tablas
+│   ├── icons/
+│   │   └── favicon.svg              # Favicon SVG vectorial integrado
+│   └── js/
+│       ├── components/
+│       │   ├── joystick.js          # Joystick táctil circular virtual con PointerEvents
+│       │   └── monitoreo.js         # Mánager reactivo de tarjeta y tabla de monitoreo
+│       ├── services/
+│       │   ├── apiService.js        # Cliente Fetch HTTP con timeout y AbortController
+│       │   └── wsService.js         # Cliente WebSocket con reconexión automática
+│       ├── state/
+│       │   └── appState.js          # Estado central reactivo de la UI
+│       ├── config.js                # URLs y constantes de la aplicación
+│       └── main.js                  # Orquestador principal de control y monitoreo
+├── frontend/                        # Copia sincronizada para despliegues alternativos
+│   ├── assets/...
+│   └── index.html
+├── index.html                       # Documento principal HTML5 semántico
+└── README.md                        # Memoria técnica y documentación
+```
 
 ---
 
-## Eventos WebSocket (WSS)
+## 4. Reglas de Negocio Implementadas
 
-Canal: `wss://44.194.225.196:8000/ws/vehiculo/{id_vehiculo}`
+1. **Prioridad Absoluta de DETENER (Código 9)**:
+   * El botón de parada de emergencia envía inmediatamente el comando `9` al backend y aborta cualquier DEMO en ejecución.
+2. **Separación Estricta de Historial vs. DEMO**:
+   * Los movimientos generados por joystick o botones táctiles se persisten en `vehiculo_iot.historial` vía REST y se transmiten por WSS como `MOVIMIENTO_INDIVIDUAL`.
+   * Los pasos internos de secuencias DEMO (`MOVIMIENTO_DEMO`) actualizan en tiempo real la **tarjeta de último estado**, pero **NO se agregan a la tabla de historial individual** para preservar la integridad de auditoría solicitada por el contrato de negocio.
+3. **Sincronización Antirraces (Debounce)**:
+   * Al recibir eventos WSS de movimientos individuales, el componente de monitoreo espera 450 ms para permitir que la transacción en Amazon RDS MySQL termine su commit antes de refrescar el historial mediante `GET /vehiculos/1/historial`.
+4. **Tres Indicadores de Salud Independientes**:
+   * **WebSocket WSS**: En línea / Conectando / Desconectado (basado en el ciclo de vida del socket).
+   * **API AWS (EC2)**: Disponible / No disponible (evaluado con endpoint `/health`).
+   * **Amazon RDS**: Disponible / No disponible (evaluado con `base_de_datos: ok` dentro de `/health`).
 
-### 1. Conexión Establecida (Estado Inicial)
-```json
-{
-  "evento": "CONEXION_ESTABLECIDA",
-  "id_vehiculo": 1,
-  "estado": {
-    "id_vehiculo": 1,
-    "vehiculo": "Excavadora IoT",
-    "id_comando": 1,
-    "comando": "AVANZAR",
-    "codigo": 1,
-    "conectado": 1,
-    "fecha_actualizacion": "2026-10-21T00:18:44"
-  },
-  "timestamp": "2026-10-21T00:18:44.326785+00:00"
-}
-```
+---
 
-### 2. Movimiento Individual (Vía POST)
-```json
-{
-  "evento": "MOVIMIENTO_INDIVIDUAL",
-  "id_vehiculo": 1,
-  "comando": "AVANZAR",
-  "codigo": 1,
-  "origen": "THUNDER-CLIENT",
-  "timestamp": "2026-10-21T00:20:10.123456+00:00"
-}
-```
+## 5. Casos de Prueba y Verificación
 
-### 3. Secuencia DEMO en Tiempo Real
-* **Inicio**:
-  ```json
-  {"evento": "DEMO_INICIO", "id_vehiculo": 1, "id_demo": 1, "total_movimientos": 8, "timestamp": "..."}
-  ```
-* **Cada paso temporizado**:
-  ```json
-  {
-    "evento": "MOVIMIENTO_DEMO",
-    "id_vehiculo": 1,
-    "orden": 1,
-    "comando": "AVANZAR",
-    "codigo": 1,
-    "duracion_ms": 2000,
-    "pausa_ms": 400,
-    "timestamp": "..."
-  }
-  ```
-* **Finalización**:
-  ```json
-  {"evento": "DEMO_FINALIZADA", "id_vehiculo": 1, "id_demo": 1, "timestamp": "..."}
-  ```
+| # | Caso de Prueba | Procedimiento | Resultado Esperado |
+|---|---|---|---|
+| 1 | **Carga Inicial de Monitoreo** | Clic en la pestaña "Monitoreo" | Se consulta `GET /vehiculos/1/estado` y `GET /vehiculos/1/historial`. La tarjeta muestra el comando actual y la tabla muestra hasta 10 filas con numeración, comando, fecha y hora. |
+| 2 | **Comando desde Pestaña Control** | Mover Joystick a AVANZAR en la pestaña "Control" | Se envía POST `comando: 1`. El badge WSS confirma el evento. Al pasar a "Monitoreo", la tarjeta y la primera fila reflejan AVANZAR. |
+| 3 | **Evento Externo Multicliente** | Enviar comando desde Thunder Client / Swagger | Monitoreo reacciona de inmediato vía WSS sin recargar la página. La tarjeta se actualiza en vivo y la tabla resincroniza sus 10 registros. |
+| 4 | **Aislamiento de DEMO** | Iniciar DEMO #1 desde Control | La tarjeta de monitoreo muestra `MOVIMIENTO_DEMO` y el número de paso en tiempo real. La tabla de 10 movimientos **mantiene intactos** los comandos individuales previos. |
+| 5 | **Reconexión Resiliente** | Cerrar y volver a abrir la red | El badge de WebSocket pasa a "Conectando..." y luego "En línea". Al reconectar, se ejecuta `cargarDatosCompletos()` para recuperar posibles eventos perdidos. |
+
+---
+
+## 6. Créditos Obligatorios
+
+* **Alumno:** Alan Santiago Rodríguez
+* **Matrícula:** 22200767
+* **Materia:** Programación e Integración de Sistemas IoT
+* **Año:** 2026

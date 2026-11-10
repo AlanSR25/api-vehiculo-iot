@@ -1,12 +1,18 @@
 /**
- * main.js - Orquestador principal de la aplicación de control IoT
+ * main.js - Orquestador principal de la aplicación de control y monitoreo IoT
+ * Cumple íntegramente con los contratos de la Práctica 4.1 y 4.2:
+ * - Navegación fluida entre CONTROL y MONITOREO sin recarga de página.
+ * - Tarjeta visual del último movimiento y tabla semántica de 10 registros persistidos.
+ * - Sincronización en tiempo real vía WebSocket (WSS) con conciliación REST hacia Amazon RDS.
+ * - Control de reglas de negocio: DEMO no contamina el historial individual.
  */
 
-import { CONFIG } from "./config.js";
+import { CONFIG } from "./config.js?v=20261110";
 import { apiService } from "./services/apiService.js";
 import { wsService, WsState } from "./services/wsService.js";
 import { appState } from "./state/appState.js";
 import { VirtualJoystick } from "./components/joystick.js";
+import { monitoreoManager } from "./components/monitoreo.js";
 
 // Mapeo unificado de comandos del vehículo (1 al 9)
 const COMANDO_MAP = {
@@ -24,6 +30,13 @@ const COMANDO_MAP = {
 
 // Elementos DOM
 const dom = {
+  // Pestañas de Navegación
+  tabBtnControl: document.getElementById("tabBtnControl"),
+  tabBtnMonitoreo: document.getElementById("tabBtnMonitoreo"),
+  vistaControl: document.getElementById("vistaControl"),
+  vistaMonitoreo: document.getElementById("vistaMonitoreo"),
+
+  // Encabezado
   vehiculoNombre: document.getElementById("vehiculoNombre"),
   vehiculoModelo: document.getElementById("vehiculoModelo"),
 
@@ -58,6 +71,7 @@ const dom = {
 
 // 1. Inicialización
 document.addEventListener("DOMContentLoaded", async () => {
+  initNavigationTabs();
   initJoystick();
   bindButtons();
   initWebSocket();
@@ -65,7 +79,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadInitialData();
 });
 
-// 2. Configurar Joystick Virtual
+// 2. Navegación por pestañas (Control / Monitoreo)
+function initNavigationTabs() {
+  if (!dom.tabBtnControl || !dom.tabBtnMonitoreo) return;
+
+  dom.tabBtnControl.addEventListener("click", () => {
+    activarPestana("CONTROL");
+  });
+
+  dom.tabBtnMonitoreo.addEventListener("click", () => {
+    activarPestana("MONITOREO");
+    // Al entrar en monitoreo, refrescamos el estado e historial desde RDS
+    monitoreoManager.cargarDatosCompletos();
+  });
+}
+
+function activarPestana(pestaña) {
+  if (pestaña === "CONTROL") {
+    dom.tabBtnControl.classList.add("active");
+    dom.tabBtnControl.setAttribute("aria-selected", "true");
+    dom.tabBtnMonitoreo.classList.remove("active");
+    dom.tabBtnMonitoreo.setAttribute("aria-selected", "false");
+
+    dom.vistaControl.classList.remove("d-none");
+    dom.vistaMonitoreo.classList.add("d-none");
+  } else {
+    dom.tabBtnMonitoreo.classList.add("active");
+    dom.tabBtnMonitoreo.setAttribute("aria-selected", "true");
+    dom.tabBtnControl.classList.remove("active");
+    dom.tabBtnControl.setAttribute("aria-selected", "false");
+
+    dom.vistaMonitoreo.classList.remove("d-none");
+    dom.vistaControl.classList.add("d-none");
+  }
+}
+
+// 3. Configurar Joystick Virtual
 function initJoystick() {
   new VirtualJoystick(dom.joystickContainer, (direction) => {
     dom.joystickDirectionText.textContent = direction;
@@ -76,9 +125,9 @@ function initJoystick() {
   });
 }
 
-// 3. Asociar Botones Secundarios
+// 4. Asociar Botones Secundarios
 function bindButtons() {
-  // DETENER prioritario
+  // DETENER prioritario (Código 9)
   dom.btnDetener.addEventListener("click", () => {
     ejecutarComando(COMANDO_MAP.DETENER, "BOTON_DETENER_PRIORITARIO");
     if (appState.demoActiva) {
@@ -121,7 +170,7 @@ function bindButtons() {
   });
 }
 
-// 4. Ejecución unificada de comandos
+// 5. Ejecución unificada de comandos
 async function ejecutarComando(codigo, origen = "FRONTEND-WEB") {
   appState.ultimaAccion.solicitada = `Comando ${codigo} (${origen})`;
   actualizarLog(`Comando ${codigo}`, "Enviando POST...", "Pendiente WSS...");
@@ -138,7 +187,7 @@ async function ejecutarComando(codigo, origen = "FRONTEND-WEB") {
   }
 }
 
-// 5. Gestión del WebSocket
+// 6. Gestión del WebSocket
 function initWebSocket() {
   wsService.onStateChange((state) => {
     appState.wsEstado = state;
@@ -160,7 +209,10 @@ function handleWebSocketMessage(msg) {
   dom.logWs.textContent = `${evento} (${cmd})`;
   dom.logWs.className = "badge bg-success-subtle text-success border border-success-subtle";
 
-  // Control visual de DEMO
+  // Reenviar a Monitoreo para actualización reactiva en tiempo real
+  monitoreoManager.procesarEventoWss(msg);
+
+  // Control visual de DEMO en la vista de Control
   if (evento === "DEMO_INICIO") {
     appState.demoActiva = true;
     dom.demoStatusCard.classList.remove("d-none");
@@ -178,7 +230,7 @@ function handleWebSocketMessage(msg) {
   }
 }
 
-// 6. Polling seguro de salud (/health)
+// 7. Polling seguro de salud (/health)
 function initHealthPolling() {
   const check = async () => {
     try {
@@ -195,12 +247,13 @@ function initHealthPolling() {
   setInterval(check, CONFIG.HEALTH_CHECK_INTERVAL_MS);
 }
 
-// 7. Carga de Catálogos Iniciales
+// 8. Carga de Catálogos Iniciales
 async function loadInitialData() {
   try {
     const [vehiculo, demos] = await Promise.all([
       apiService.getVehiculo().catch(() => null),
       apiService.getDemos().catch(() => []),
+      monitoreoManager.cargarDatosCompletos().catch(() => null),
     ]);
 
     if (vehiculo) {
@@ -218,7 +271,7 @@ async function loadInitialData() {
   }
 }
 
-// 8. Renderizado de los 3 Indicadores Obligatorios
+// 9. Renderizado de los 3 Indicadores Obligatorios
 function renderWsStatus(state) {
   if (state === WsState.ONLINE) {
     dom.wsStatusBadge.className = "badge bg-success";
@@ -263,4 +316,3 @@ function actualizarLog(solicitud, http, ws) {
   dom.logHttp.textContent = http;
   if (ws) dom.logWs.textContent = ws;
 }
-

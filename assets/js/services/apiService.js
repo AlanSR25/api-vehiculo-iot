@@ -63,6 +63,16 @@ class ApiService {
     return this._request(CONFIG.ENDPOINTS.COMANDOS(id));
   }
 
+  // 3.1 Último estado del vehículo (RDS)
+  async getEstado(id = CONFIG.VEHICLE_ID) {
+    return this._request(CONFIG.ENDPOINTS.ESTADO(id));
+  }
+
+  // 3.2 Últimos 10 movimientos individuales (RDS)
+  async getHistorial(id = CONFIG.VEHICLE_ID) {
+    return this._request(CONFIG.ENDPOINTS.HISTORIAL(id));
+  }
+
   // 4. Catálogo de DEMOs disponibles
   async getDemos(id = CONFIG.VEHICLE_ID) {
     return this._request(CONFIG.ENDPOINTS.DEMOS(id));
