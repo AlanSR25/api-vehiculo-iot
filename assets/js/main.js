@@ -2,7 +2,7 @@
  * main.js - Orquestador principal de la aplicación de control IoT
  */
 
-import { CONFIG } from "./config.js";
+import { CONFIG } from "./config.js?v=20261110";
 import { apiService } from "./services/apiService.js";
 import { wsService, WsState } from "./services/wsService.js";
 import { appState } from "./state/appState.js";
