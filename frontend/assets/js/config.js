@@ -4,11 +4,11 @@
  */
 
 export const CONFIG = {
-  // URL base HTTPS de la API en Amazon EC2
-  API_BASE_URL: "https://44.194.225.196:8000",
+  // URL base HTTPS con certificado SSL oficial de confianza mundial (Cloudflare)
+  API_BASE_URL: "https://mitsubishi-equal-waiver-operated.trycloudflare.com",
 
-  // URL WebSocket WSS del vehículo 1
-  WS_URL: "wss://44.194.225.196:8000/ws/vehiculo/1",
+  // URL WebSocket WSS segura
+  WS_URL: "wss://mitsubishi-equal-waiver-operated.trycloudflare.com/ws/vehiculo/1",
 
   // ID del vehículo asignado para la práctica
   VEHICLE_ID: 1,
