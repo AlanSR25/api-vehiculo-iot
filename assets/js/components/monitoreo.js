@@ -236,3 +236,4 @@ class MonitoreoManager {
 }
 
 export const monitoreoManager = new MonitoreoManager();
+

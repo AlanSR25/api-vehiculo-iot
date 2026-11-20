@@ -11,10 +11,10 @@
 ## 1. Enlaces Públicos y Contratos del Sistema
 
 * **Frontend Web (GitHub Pages)**: `https://alansr25.github.io/api-vehiculo-iot/`
-* **Base API HTTPS (Cloudflare Tunnel)**: `https://bath-sunrise-stomach-grown.trycloudflare.com`
-* **Documentación Swagger / OpenAPI**: `https://bath-sunrise-stomach-grown.trycloudflare.com/docs`
-* **Canal WebSocket Seguro (WSS)**: `wss://bath-sunrise-stomach-grown.trycloudflare.com/ws/vehiculo/1`
-* **Diagnóstico de Salud (Health)**: `https://bath-sunrise-stomach-grown.trycloudflare.com/health`
+* **Base API HTTPS (Cloudflare Tunnel)**: `https://alleged-radio-preparing-actress.trycloudflare.com`
+* **Documentación Swagger / OpenAPI**: `https://alleged-radio-preparing-actress.trycloudflare.com/docs`
+* **Canal WebSocket Seguro (WSS)**: `wss://alleged-radio-preparing-actress.trycloudflare.com/ws/vehiculo/1`
+* **Diagnóstico de Salud (Health)**: `https://alleged-radio-preparing-actress.trycloudflare.com/health`
 * **GET Último Estado**: `GET /vehiculos/1/estado`
 * **GET Historial (10 individuales)**: `GET /vehiculos/1/historial`
 * **IP Directa EC2 (Backup)**: `44.194.225.196:8000`
@@ -34,7 +34,7 @@
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │              CLOUDFLARE EDGE & TUNNEL (Certificado TLS Válido)         │
-│  - Endpoint: bath-sunrise-stomach-grown.trycloudflare.com              │
+│  - Endpoint: alleged-radio-preparing-actress.trycloudflare.com         │
 │  - Sin advertencias SSL en navegadores móviles (iOS / Android)         │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ localhost:8000

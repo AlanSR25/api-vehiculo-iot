@@ -7,7 +7,7 @@
  * - Control de reglas de negocio: DEMO no contamina el historial individual.
  */
 
-import { CONFIG } from "./config.js?v=20261110";
+import { CONFIG } from "./config.js?v=20261119";
 import { apiService } from "./services/apiService.js";
 import { wsService, WsState } from "./services/wsService.js";
 import { appState } from "./state/appState.js";
