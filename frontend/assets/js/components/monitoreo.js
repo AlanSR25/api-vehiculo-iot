@@ -1,40 +1,25 @@
 /**
- * monitoreo.js - Componente modular para la vista de MONITOREO IoT en tiempo real
- * Cumple con:
- * 1. Tarjeta visual destacada del último movimiento/estado reportado.
- * 2. Tabla semántica responsiva de los últimos 10 movimientos individuales (RDS).
- * 3. Actualización inmediata por WSS sin recargar la página.
- * 4. Regla estricta: los movimientos de DEMO actualizan el estado en vivo,
- *    pero NO contaminan la tabla de historial individual.
+ * monitoreo.js - Componente modular para la vista de MONITOREO IoT en tiempo real (4.2 + 4.3)
+ * - Filtra estrictamente eventos WSS por el id_vehiculo activo (evita fugas entre unidades).
+ * - Actualiza tarjeta de último movimiento en vivo y sincroniza los 10 registros persistidos en RDS.
+ * - Regla estricta: MOVIMIENTO_DEMO actualiza la tarjeta en vivo pero NO contamina la tabla individual.
  */
 
-import { apiService } from "../services/apiService.js";
+import { apiService } from "../services/apiService.js?v=20261119b";
 
-// Utilidad para formatear fechas de forma segura y legible
 export function formatearFechaHora(fechaStr) {
   if (!fechaStr) return { fecha: "--", hora: "--" };
   try {
     const d = new Date(fechaStr);
     if (isNaN(d.getTime())) return { fecha: fechaStr, hora: "" };
-    
-    const fecha = d.toLocaleDateString("es-MX", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const hora = d.toLocaleTimeString("es-MX", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
+    const fecha = d.toLocaleDateString("es-MX", { year: "numeric", month: "2-digit", day: "2-digit" });
+    const hora = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
     return { fecha, hora };
   } catch {
     return { fecha: fechaStr, hora: "" };
   }
 }
 
-// Genera un badge de color según el comando
 export function getBadgeComando(nombre, codigo) {
   const c = String(nombre || "").toUpperCase();
   let bgClass = "bg-secondary";
@@ -50,19 +35,21 @@ export function getBadgeComando(nombre, codigo) {
   else if (c.includes("DETENER")) { bgClass = "bg-danger"; icon = "bi-stop-circle-fill"; }
   else if (c.includes("DEMO") || c.includes("GRABAR")) { bgClass = "bg-success"; icon = "bi-play-circle"; }
 
-  const codText = (codigo !== undefined && codigo !== null) ? ` (#${codigo})` : "";
+  const codText = codigo !== undefined && codigo !== null ? ` (#${codigo})` : "";
   return `<span class="badge ${bgClass}"><i class="bi ${icon} me-1"></i>${c}${codText}</span>`;
 }
 
 class MonitoreoManager {
   constructor() {
+    this.vehicleId = 1;
+    this.vehicleName = "Excavadora IoT";
     this.ultimoEstado = null;
     this.historial = [];
     this.syncTimeout = null;
     this.cargando = false;
 
-    // Elementos DOM de Monitoreo
     this.dom = {
+      cardTituloVehiculo: document.getElementById("monitoreoTituloVehiculo"),
       cardComando: document.getElementById("monitoreoUltimoComando"),
       cardBadge: document.getElementById("monitoreoUltimoBadge"),
       cardFecha: document.getElementById("monitoreoUltimaFecha"),
@@ -78,32 +65,76 @@ class MonitoreoManager {
     }
   }
 
-  // 1. Carga inicial vía REST de estado e historial (10 más recientes)
+  setVehicle(vehicleId, vehicleName = null) {
+    this.vehicleId = Number(vehicleId);
+    if (vehicleName) this.vehicleName = vehicleName;
+    if (this.dom.cardTituloVehiculo) {
+      this.dom.cardTituloVehiculo.textContent = `Vehículo #${this.vehicleId} · ${this.vehicleName}`;
+    }
+    this.ultimoEstado = null;
+    this.historial = [];
+  }
+
   async cargarDatosCompletos() {
+    if (!apiService.getToken() || !this.vehicleId) {
+      if (this.dom.tablaBody) {
+        this.dom.tablaBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center py-4 text-secondary">
+              <i class="bi bi-lock fs-4 d-block mb-1"></i>
+              Inicia sesión o reserva una unidad de exhibición para monitorear telemetría.
+            </td>
+          </tr>`;
+      }
+      return;
+    }
+
     this.cargando = true;
     this._renderCargando(true);
+    const targetId = this.vehicleId;
 
     try {
       const [estadoData, historialData] = await Promise.all([
-        apiService.getEstado().catch(() => null),
-        apiService.getHistorial().catch(() => []),
+        apiService.getEstado(targetId),
+        apiService.getHistorial(targetId),
       ]);
+
+      // Protección contra respuestas atrasadas si el usuario cambió de vehículo
+      if (targetId !== this.vehicleId) return;
 
       if (estadoData && (estadoData.comando || estadoData.id_comando)) {
         this.renderTarjetaUltimoEstado({
           comando: estadoData.comando || `Comando #${estadoData.id_comando}`,
-          codigo: estadoData.codigo || estadoData.id_comando,
+          codigo: estadoData.codigo ?? estadoData.id_comando,
           fecha_actualizacion: estadoData.fecha_actualizacion,
           origen: "PERSISTIDO EN RDS",
+        });
+      } else {
+        this.renderTarjetaUltimoEstado({
+          comando: "SIN MOVIMIENTOS",
+          codigo: null,
+          fecha_actualizacion: null,
+          origen: "RDS",
         });
       }
 
       this.historial = Array.isArray(historialData) ? historialData.slice(0, 10) : [];
+      if (this.dom.tablaEstadoText) {
+        this.dom.tablaEstadoText.textContent = `Registros persistidos en Amazon RDS · Unidad #${this.vehicleId}`;
+      }
       this.renderTablaHistorial();
     } catch (err) {
-      console.error("Error al cargar datos de monitoreo:", err);
       if (this.dom.tablaEstadoText) {
-        this.dom.tablaEstadoText.textContent = "Error de conexión al consultar RDS";
+        this.dom.tablaEstadoText.textContent = `Error: ${err.message}`;
+      }
+      if (this.dom.tablaBody) {
+        this.dom.tablaBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center py-4 text-danger">
+              <i class="bi bi-shield-exclamation fs-4 d-block mb-1"></i>
+              ${err.message}
+            </td>
+          </tr>`;
       }
     } finally {
       this.cargando = false;
@@ -111,14 +142,13 @@ class MonitoreoManager {
     }
   }
 
-  // 2. Renderizado de la Tarjeta Destacada de Último Movimiento
   renderTarjetaUltimoEstado(datos) {
     if (!datos) return;
     this.ultimoEstado = datos;
 
     const nombre = datos.comando || "DETENER";
     const codigo = datos.codigo !== undefined ? datos.codigo : datos.id_comando;
-    const { fecha, hora } = formatearFechaHora(datos.fecha_actualizacion || datos.timestamp || new Date().toISOString());
+    const { fecha, hora } = formatearFechaHora(datos.fecha_actualizacion || datos.timestamp);
 
     if (this.dom.cardComando) this.dom.cardComando.textContent = nombre;
     if (this.dom.cardBadge) this.dom.cardBadge.innerHTML = getBadgeComando(nombre, codigo);
@@ -127,7 +157,6 @@ class MonitoreoManager {
     if (this.dom.cardOrigen) this.dom.cardOrigen.textContent = datos.origen || "EN VIVO (WSS)";
   }
 
-  // 3. Renderizado de la Tabla Semántica de los 10 Movimientos
   renderTablaHistorial() {
     if (!this.dom.tablaBody) return;
 
@@ -136,34 +165,34 @@ class MonitoreoManager {
         <tr>
           <td colspan="5" class="text-center py-4 text-secondary">
             <i class="bi bi-inbox fs-4 d-block mb-1"></i>
-            Sin movimientos registrados en el historial
+            Sin movimientos registrados para esta unidad
           </td>
         </tr>`;
       return;
     }
 
-    const html = this.historial.map((item, index) => {
-      const { fecha, hora } = formatearFechaHora(item.fecha_hora);
-      const badge = getBadgeComando(item.comando, item.codigo);
-      const origen = item.origen || "API";
-      return `
-        <tr>
-          <td class="text-secondary fw-semibold">${index + 1}</td>
-          <td>${badge}</td>
-          <td><span class="text-white">${fecha}</span></td>
-          <td><span class="text-info">${hora}</span></td>
-          <td><small class="badge bg-dark border border-secondary text-secondary">${origen}</small></td>
-        </tr>`;
-    }).join("");
-
-    this.dom.tablaBody.innerHTML = html;
+    this.dom.tablaBody.innerHTML = this.historial
+      .map((item, index) => {
+        const { fecha, hora } = formatearFechaHora(item.fecha_hora);
+        const badge = getBadgeComando(item.comando, item.codigo);
+        const origen = item.origen || "API";
+        return `
+          <tr>
+            <td class="text-secondary fw-semibold">${index + 1}</td>
+            <td>${badge}</td>
+            <td><span class="text-white">${fecha}</span></td>
+            <td><span class="text-info">${hora}</span></td>
+            <td><small class="badge bg-dark border border-secondary text-secondary">${origen}</small></td>
+          </tr>`;
+      })
+      .join("");
   }
 
-  // 4. Recepción de Eventos WebSocket en Vivo
   procesarEventoWss(msg) {
     if (!msg || !msg.evento) return;
+    // Filtrar estrictamente eventos de otros vehículos
+    if (msg.id_vehiculo && Number(msg.id_vehiculo) !== Number(this.vehicleId)) return;
 
-    // Caso A: Movimiento individual confirmado en WSS
     if (msg.evento === "MOVIMIENTO_INDIVIDUAL") {
       this.renderTarjetaUltimoEstado({
         comando: msg.comando,
@@ -171,58 +200,47 @@ class MonitoreoManager {
         timestamp: msg.timestamp || new Date().toISOString(),
         origen: msg.origen || "WSS EN TIEMPO REAL",
       });
-
-      // Disparar sincronización controlada con RDS para traer el registro recién persistido
       this._solicitarSyncHistorial();
-    }
-
-    // Caso B: Pasos de DEMO en ejecución
-    // La regla de negocio dice: la tarjeta de estado se actualiza en tiempo real,
-    // pero la tabla de historial NO se contamina con pasos internos de DEMO.
-    else if (msg.evento === "MOVIMIENTO_DEMO") {
+    } else if (msg.evento === "MOVIMIENTO_DEMO") {
+      // Regla estricta: DEMO actualiza tarjeta pero NO entra al historial individual
       this.renderTarjetaUltimoEstado({
         comando: msg.comando,
         codigo: msg.codigo,
         timestamp: msg.timestamp || new Date().toISOString(),
         origen: `DEMO (Paso ${msg.orden || "-"})`,
       });
-    }
-
-    // Caso C: DEMO finalizada o cancelada
-    else if (msg.evento === "DEMO_FINALIZADA" || msg.evento === "DEMO_CANCELADA") {
+    } else if (msg.evento === "DEMO_FINALIZADA" || msg.evento === "DEMO_CANCELADA") {
       this.renderTarjetaUltimoEstado({
         comando: "DETENER",
         codigo: 9,
         timestamp: msg.timestamp || new Date().toISOString(),
         origen: msg.evento === "DEMO_FINALIZADA" ? "FIN DE DEMO" : "DEMO CANCELADA",
       });
-    }
-
-    // Caso D: Conexión establecida con estado inicial
-    else if (msg.evento === "CONEXION_ESTABLECIDA" && msg.estado) {
+    } else if (msg.evento === "CONEXION_ESTABLECIDA" && msg.estado) {
       this.renderTarjetaUltimoEstado({
         comando: msg.estado.comando,
-        codigo: msg.estado.codigo || msg.estado.id_comando,
+        codigo: msg.estado.codigo ?? msg.estado.id_comando,
         fecha_actualizacion: msg.estado.fecha_actualizacion,
         origen: "ESTADO INICIAL",
       });
     }
   }
 
-  // Sincronización controlada antirráfagas (Debounce)
   _solicitarSyncHistorial() {
     if (this.syncTimeout) clearTimeout(this.syncTimeout);
+    const targetId = this.vehicleId;
     this.syncTimeout = setTimeout(async () => {
+      if (targetId !== this.vehicleId || !apiService.getToken()) return;
       try {
-        const data = await apiService.getHistorial();
-        if (Array.isArray(data)) {
+        const data = await apiService.getHistorial(targetId);
+        if (Array.isArray(data) && targetId === this.vehicleId) {
           this.historial = data.slice(0, 10);
           this.renderTablaHistorial();
         }
       } catch (err) {
         console.warn("Fallo al resincronizar historial tras WSS:", err);
       }
-    }, 450); // 450ms de tolerancia para asegurar commit en RDS
+    }, 450);
   }
 
   _renderCargando(cargando) {

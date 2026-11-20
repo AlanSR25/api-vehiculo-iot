@@ -1,122 +1,89 @@
-# Aplicación Web de Control y Monitoreo IoT en Tiempo Real
-**Práctica 4.1 (Control) & Práctica 4.2 (Monitoreo)**
+# Plataforma Comercial Multiusuario IoT (4.1 Control · 4.2 Monitoreo · 4.3 Administración)
+
 **Alumno:** Alan Santiago Rodríguez  
 **Matrícula:** 22200767  
 **Año:** 2026  
 **Repositorio GitHub:** [https://github.com/AlanSR25/api-vehiculo-iot](https://github.com/AlanSR25/api-vehiculo-iot)  
-**Despliegue GitHub Pages:** [https://alansr25.github.io/api-vehiculo-iot/](https://alansr25.github.io/api-vehiculo-iot/)  
+**Aplicación Web Pública (GitHub Pages):** [https://alansr25.github.io/api-vehiculo-iot/](https://alansr25.github.io/api-vehiculo-iot/)  
 
 ---
 
-## 1. Enlaces Públicos y Contratos del Sistema
+## 1. Enlaces Públicos y Contratos Activos
 
-* **Frontend Web (GitHub Pages)**: `https://alansr25.github.io/api-vehiculo-iot/`
-* **Base API HTTPS (Cloudflare Tunnel)**: `https://alleged-radio-preparing-actress.trycloudflare.com`
+* **Frontend Integrado (Control + Monitoreo + Administración)**: `https://alansr25.github.io/api-vehiculo-iot/`
+* **Base API HTTPS (Cloudflare TLS)**: `https://alleged-radio-preparing-actress.trycloudflare.com`
 * **Documentación Swagger / OpenAPI**: `https://alleged-radio-preparing-actress.trycloudflare.com/docs`
-* **Canal WebSocket Seguro (WSS)**: `wss://alleged-radio-preparing-actress.trycloudflare.com/ws/vehiculo/1`
-* **Diagnóstico de Salud (Health)**: `https://alleged-radio-preparing-actress.trycloudflare.com/health`
-* **GET Último Estado**: `GET /vehiculos/1/estado`
-* **GET Historial (10 individuales)**: `GET /vehiculos/1/historial`
-* **IP Directa EC2 (Backup)**: `44.194.225.196:8000`
+* **Canal WebSocket Seguro Autenticado (WSS)**: `wss://alleged-radio-preparing-actress.trycloudflare.com/ws/vehiculo/{id_vehiculo}?token={jwt}`
+* **Diagnóstico de Salud (API + RDS)**: `https://alleged-radio-preparing-actress.trycloudflare.com/health`
 
 ---
 
-## 2. Diagrama de Arquitectura Integral
+## 2. Modelo de Negocio y Roles (RBAC + Autorización por Recurso)
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   CLIENTES (Mobile First / Desktop)                     │
-│  - GitHub Pages: https://alansr25.github.io/api-vehiculo-iot/          │
-│  - Vista 1: CONTROL (Joystick táctil PointerEvents, DETENER, DEMO)     │
-│  - Vista 2: MONITOREO (Tarjeta último estado + Tabla 10 movimientos)   │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ HTTPS (Fetch REST) / WSS (WebSocket)
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│              CLOUDFLARE EDGE & TUNNEL (Certificado TLS Válido)         │
-│  - Endpoint: alleged-radio-preparing-actress.trycloudflare.com         │
-│  - Sin advertencias SSL en navegadores móviles (iOS / Android)         │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ localhost:8000
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                  AMAZON EC2 (Windows Server 2019)                      │
-│  - FastAPI + Uvicorn (Daemon persistente bajo Administrador/SYSTEM)    │
-│  - 21 Servicios REST mapeados a Stored Procedures                      │
-│  - WebSocket Hub bidireccional multicliente (/ws/vehiculo/{id})        │
-│  - CORS Middleware: orígenes abiertos (*) para GitHub Pages            │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ MySQL TCP (Puerto 3306)
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                  AMAZON RDS for MySQL (vehiculo_iot)                   │
-│  - 6 Tablas relacionales (vehiculos, comandos, estado, historial, etc.) │
-│  - 21 Procedimientos almacenados para aislamiento y seguridad SQL      │
-└────────────────────────────────────────────────────────────────────────┘
-```
+| Rol | Alcance en Frontend | Seguridad Aplicada en FastAPI y WSS |
+|---|---|---|
+| **ADMIN** (Empresa) | Dashboard KPI real, CRUD de Modelos Comerciales, CRUD de Unidades Físicas, Clientes, Asignaciones, Demos de Fábrica y Bitácora de Auditoría. | Acceso total a `/admin/*`. **Bloqueado (`403`)** para operar físicamente unidades vendidas a compradores salvo autorización explícita de soporte (`soporte_autorizado = 1`). |
+| **USUARIO** (Comprador) | **«Mis Vehículos»**, Control, Monitoreo, switch de autorización de soporte técnico y Editor Visual de Demos Privadas. | Aislamiento estricto anti-IDOR/BOLA: solo consulta/opera unidades donde `id_propietario == user.id`. Cualquier otro ID devuelve `403 Forbidden` tanto en REST como en WSS (`4003`). |
+| **INVITADO** (Prospecto) | **«Prueba nuestros vehículos IoT»**: catálogo público de modelos y reserva exclusiva temporal (90s) de unidades en estado `EXHIBICION`. | Reserva exclusiva en RDS (`409 Conflict` si otro invitado la ocupa). Comandos restringidos (`1,2,3,4,7,9`). Al expirar o finalizar, se emite `DETENER (9)` automático por WSS. |
 
 ---
 
-## 3. Estructura de Carpetas del Proyecto
+## 3. Migración Incremental de Base de Datos (V4.3.0)
 
-```
-api_vehiculo_iot_ec2/
-├── assets/
-│   ├── css/
-│   │   └── styles.css               # Estilos oscuros Mobile-First, tabs y tablas
-│   ├── icons/
-│   │   └── favicon.svg              # Favicon SVG vectorial integrado
-│   └── js/
-│       ├── components/
-│       │   ├── joystick.js          # Joystick táctil circular virtual con PointerEvents
-│       │   └── monitoreo.js         # Mánager reactivo de tarjeta y tabla de monitoreo
-│       ├── services/
-│       │   ├── apiService.js        # Cliente Fetch HTTP con timeout y AbortController
-│       │   └── wsService.js         # Cliente WebSocket con reconexión automática
-│       ├── state/
-│       │   └── appState.js          # Estado central reactivo de la UI
-│       ├── config.js                # URLs y constantes de la aplicación
-│       └── main.js                  # Orquestador principal de control y monitoreo
-├── frontend/                        # Copia sincronizada para despliegues alternativos
-│   ├── assets/...
-│   └── index.html
-├── index.html                       # Documento principal HTML5 semántico
-└── README.md                        # Memoria técnica y documentación
-```
+* **Respaldo previo**: `backups/respaldo_4_2_previo_4_3.sql` generado en EC2 antes de cualquier DDL.
+* **Scripts versionados**:
+  * [`migrations/V4.3.0__ampliacion_comercial_up.sql`](migrations/V4.3.0__ampliacion_comercial_up.sql)
+  * [`migrations/V4.3.0__ampliacion_comercial_down.sql`](migrations/V4.3.0__ampliacion_comercial_down.sql)
+  * [`migrations/apply_v4_3_0.py`](migrations/apply_v4_3_0.py) (aplicador idempotente)
+* **Preservación de datos**: Las 6 tablas originales y los **201 registros históricos** de `historial_comandos` se conservaron intactos.
+* **Tablas agregadas**: `roles`, `usuarios`, `modelos_comerciales`, `sesiones_invitado`, `auditoria`.
+* **Columnas incrementales**: `vehiculos` (`numero_serie`, `id_modelo`, `id_propietario`, `estado_comercial`, `soporte_autorizado`) y `demos` (`id_usuario`, `tipo_demo`).
 
 ---
 
-## 4. Reglas de Negocio Implementadas
+## 4. Endpoints Nuevos de la Práctica 4.3 (Ampliación sobre las 21 APIs)
 
-1. **Prioridad Absoluta de DETENER (Código 9)**:
-   * El botón de parada de emergencia envía inmediatamente el comando `9` al backend y aborta cualquier DEMO en ejecución.
-2. **Separación Estricta de Historial vs. DEMO**:
-   * Los movimientos generados por joystick o botones táctiles se persisten en `vehiculo_iot.historial` vía REST y se transmiten por WSS como `MOVIMIENTO_INDIVIDUAL`.
-   * Los pasos internos de secuencias DEMO (`MOVIMIENTO_DEMO`) actualizan en tiempo real la **tarjeta de último estado**, pero **NO se agregan a la tabla de historial individual** para preservar la integridad de auditoría solicitada por el contrato de negocio.
-3. **Sincronización Antirraces (Debounce)**:
-   * Al recibir eventos WSS de movimientos individuales, el componente de monitoreo espera 450 ms para permitir que la transacción en Amazon RDS MySQL termine su commit antes de refrescar el historial mediante `GET /vehiculos/1/historial`.
-4. **Tres Indicadores de Salud Independientes**:
-   * **WebSocket WSS**: En línea / Conectando / Desconectado (basado en el ciclo de vida del socket).
-   * **API AWS (EC2)**: Disponible / No disponible (evaluado con endpoint `/health`).
-   * **Amazon RDS**: Disponible / No disponible (evaluado con `base_de_datos: ok` dentro de `/health`).
+* **Autenticación**: `POST /auth/login`, `POST /auth/logout` (revocación real), `GET /auth/me`.
+* **Administración (Solo ADMIN)**: `GET /admin/dashboard`, `GET/POST/PUT /admin/modelos`, `GET/POST/PUT/DELETE /admin/unidades` (baja lógica), `PATCH /admin/unidades/{id}/asignar`, `GET/POST/PUT /admin/clientes`, `GET /admin/auditoria`.
+* **Comprador**: `GET /mis-vehiculos`, `PATCH /mis-vehiculos/{id}/soporte`.
+* **Editor Visual de Demos**: `GET /editor-demos/vehiculo/{id}`, `POST /editor-demos`, `PUT /editor-demos/{id}`, `DELETE /editor-demos/{id}`.
+* **Invitado y Exhibición**: `GET /catalogo/publico`, `POST /invitado/sesiones/iniciar`, `GET /invitado/sesiones/actual`, `POST /invitado/sesiones/finalizar`.
 
 ---
 
-## 5. Casos de Prueba y Verificación
+## 5. Variables de Entorno (Solo Nombres)
 
-| # | Caso de Prueba | Procedimiento | Resultado Esperado |
-|---|---|---|---|
-| 1 | **Carga Inicial de Monitoreo** | Clic en la pestaña "Monitoreo" | Se consulta `GET /vehiculos/1/estado` y `GET /vehiculos/1/historial`. La tarjeta muestra el comando actual y la tabla muestra hasta 10 filas con numeración, comando, fecha y hora. |
-| 2 | **Comando desde Pestaña Control** | Mover Joystick a AVANZAR en la pestaña "Control" | Se envía POST `comando: 1`. El badge WSS confirma el evento. Al pasar a "Monitoreo", la tarjeta y la primera fila reflejan AVANZAR. |
-| 3 | **Evento Externo Multicliente** | Enviar comando desde Thunder Client / Swagger | Monitoreo reacciona de inmediato vía WSS sin recargar la página. La tarjeta se actualiza en vivo y la tabla resincroniza sus 10 registros. |
-| 4 | **Aislamiento de DEMO** | Iniciar DEMO #1 desde Control | La tarjeta de monitoreo muestra `MOVIMIENTO_DEMO` y el número de paso en tiempo real. La tabla de 10 movimientos **mantiene intactos** los comandos individuales previos. |
-| 5 | **Reconexión Resiliente** | Cerrar y volver a abrir la red | El badge de WebSocket pasa a "Conectando..." y luego "En línea". Al reconectar, se ejecuta `cargarDatosCompletos()` para recuperar posibles eventos perdidos. |
+`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_POOL_SIZE`, `JWT_SECRET`, `JWT_EXPIRES_MINUTES`, `INVITADO_MAX_SECONDS`.  
+*(Ninguna credencial real se almacena en el repositorio ni en el frontend).*
 
 ---
 
-## 6. Créditos Obligatorios
+## 6. Matriz de Pruebas Verificadas (P01 – P17)
 
-* **Alumno:** Alan Santiago Rodríguez
-* **Matrícula:** 22200767
-* **Materia:** Programación e Integración de Sistemas IoT
-* **Año:** 2026
+Suite automatizada reproducible en [`tests/test_seguridad_4_3.py`](tests/test_seguridad_4_3.py):
+
+| ID | Prueba | Resultado |
+|---|---|---|
+| P01 | Login Admin + Dashboard KPIs reales desde RDS | **Correcto (200)** |
+| P02 | Alta de modelo comercial y unidad física con serie única | **Correcto (201)** |
+| P03 | Alta de cliente comprador con hash PBKDF2-SHA256 | **Correcto (201)** |
+| P04 | Asignación/reasignación de unidad conservando historial | **Correcto (200)** |
+| P05 | Aislamiento de comprador («Mis Vehículos» solo devuelve propios) | **Correcto (200)** |
+| P06 | Control de unidad propia (Joystick, botones y DETENER prioritario) | **Correcto (200)** |
+| P07 | Canal WSS autenticado por token y filtrado por `id_vehiculo` | **Correcto** |
+| P08 | Historial de 10 movimientos individuales persistidos (sin pasos DEMO) | **Correcto (200)** |
+| P09 | Editor visual de demos persistente en RDS (pasos ordenados y duración) | **Correcto (201)** |
+| P10 | Ejecución y cancelación segura de DEMO con prioridad de DETENER | **Correcto (202/200)** |
+| P11 | Catálogo público + Reserva temporal de Invitado con comandos restringidos | **Correcto (201/403)** |
+| P12 | Rechazo de acceso a Administración a Invitado/Usuario y 401 sin token | **Correcto (401/403)** |
+| P13 | Rechazo de vehículo ajeno (IDOR) y de Admin sin soporte en unidad vendida | **Correcto (403)** |
+| P14 | Exclusividad de control: segunda sesión de Invitado bloqueada | **Correcto (409)** |
+| P15 | Reconexión WSS y resincronización automática vía REST | **Correcto** |
+| P16 | Diseño Mobile First responsivo en 3 vistas + 3 indicadores + créditos | **Correcto** |
+| P17 | Registro y consulta de Bitácora de Auditoría en RDS | **Correcto (200)** |
+
+---
+
+## 7. Créditos
+
+* **Desarrollado por:** Alan Santiago Rodríguez (Matrícula: 22200767) · 2026

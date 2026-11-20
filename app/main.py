@@ -9,16 +9,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.database import DatabaseNotConfiguredError, db_manager
+from app.core.security import decode_access_token, verificar_autorizacion_vehiculo
 from app.repositories.sp_repository import sp_repo
-from app.routers import comandos, demos, estado_historial, vehiculos
+from app.routers import admin, auth, comandos, demos, demos_editor, estado_historial, invitado, vehiculos
 from app.websocket.connection_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="API Vehículo IoT - Entorno Dev",
-    description="API REST y WebSocket con 21 procedimientos almacenados sobre MySQL/Amazon RDS.",
-    version="1.0.0",
+    title="API Vehículo IoT - Plataforma Comercial 4.3",
+    description="API REST y WebSocket (Control 4.1 + Monitoreo 4.2 + Administración Comercial 4.3) con RBAC, autorización por recurso y 21 procedimientos almacenados sobre Amazon RDS MySQL.",
+    version="4.3.0",
 )
 
 # Configuración de CORS autorizada para GitHub Pages, localhost y orígenes seguros
@@ -30,6 +31,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(admin.router)
+app.include_router(invitado.router)
+app.include_router(demos_editor.router)
 app.include_router(vehiculos.router)
 app.include_router(comandos.router)
 app.include_router(estado_historial.router)
@@ -74,6 +79,21 @@ def health():
 
 @app.websocket("/ws/vehiculo/{id_vehiculo}")
 async def websocket_vehiculo(websocket: WebSocket, id_vehiculo: int):
+    token = websocket.query_params.get("token")
+    device = websocket.query_params.get("device")
+
+    # Autorización estricta de canal WSS (evita fuga de eventos entre usuarios)
+    if device != "esp32":
+        if not token:
+            await websocket.close(code=4001, reason="Autenticacion WSS requerida")
+            return
+        try:
+            user = decode_access_token(token)
+            verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
+        except Exception as exc:
+            await websocket.close(code=4003, reason=str(getattr(exc, "detail", "Acceso WSS denegado"))[:120])
+            return
+
     await ws_manager.connect(id_vehiculo, websocket)
     try:
         estado = await asyncio.to_thread(sp_repo.sp_obtener_estado, id_vehiculo)

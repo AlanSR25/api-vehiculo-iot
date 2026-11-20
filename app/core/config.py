@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = ""
     DB_NAME: str = "vehiculo_iot"
     DB_POOL_SIZE: int = 5
+    JWT_SECRET: str = "iot_plataforma_comercial_4_3_clave_servidor_2026"
+    JWT_EXPIRES_MINUTES: int = 480
+    INVITADO_MAX_SECONDS: int = 120
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -24,4 +27,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

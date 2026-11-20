@@ -1,8 +1,9 @@
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.security import get_current_user, verificar_autorizacion_vehiculo
 from app.models.schemas import EstadoActualizar, MovimientoIndividual
 from app.repositories.sp_repository import sp_repo
 from app.services.demo_runner import demo_runner
@@ -53,23 +54,28 @@ async def _reproducir_secuencia_en_ram(vehiculo_id: int, pasos: list[dict]):
 
 
 @router.get("/vehiculos/{id_vehiculo}/estado")
-def obtener_estado(id_vehiculo: int):
+def obtener_estado(id_vehiculo: int, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
     result = sp_repo.sp_obtener_estado(id_vehiculo)
     return result[0] if result else {}
 
 
 @router.put("/vehiculos/{id_vehiculo}/estado")
-def actualizar_estado(id_vehiculo: int, datos: EstadoActualizar):
+def actualizar_estado(id_vehiculo: int, datos: EstadoActualizar, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="OPERAR")
     sp_repo.sp_actualizar_estado(id_vehiculo, datos.id_comando, datos.conectado)
     return {"mensaje": "Estado actualizado"}
 
 
 @router.get("/vehiculos/{id_vehiculo}/historial")
-def obtener_historial(id_vehiculo: int): return sp_repo.sp_obtener_historial(id_vehiculo)[:10]
+def obtener_historial(id_vehiculo: int, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
+    return sp_repo.sp_obtener_historial(id_vehiculo)[:10]
 
 
 @router.post("/vehiculos/{id_vehiculo}/movimiento")
-async def ejecutar_movimiento(id_vehiculo: int, datos: MovimientoIndividual):
+async def ejecutar_movimiento(id_vehiculo: int, datos: MovimientoIndividual, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
     vehiculos, comandos = await asyncio.gather(
         asyncio.to_thread(sp_repo.sp_obtener_vehiculo, id_vehiculo),
         asyncio.to_thread(sp_repo.sp_obtener_comandos_vehiculo, id_vehiculo),
@@ -119,6 +125,9 @@ async def ejecutar_movimiento(id_vehiculo: int, datos: MovimientoIndividual):
 
     if not comando:
         raise HTTPException(400, f"Comando '{valor}' inválido o no pertenece a este vehículo (usa números del 1 al 9)")
+
+    # Verificar autorización de operación (incluye restricción de comandos de Invitado, exclusividad y soporte Admin)
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="OPERAR", comando_codigo=comando.get("codigo"))
 
     # =========================================================================
     # BOTÓN 8: RECORD & PLAYBACK VOLÁTIL (GRABA EN MEMORIA Y AL 2DO 8 REPRODUCE)

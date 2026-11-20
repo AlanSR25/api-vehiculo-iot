@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.security import get_current_user, verificar_autorizacion_vehiculo
 from app.models.schemas import DemoActualizar, DemoCrear, DemoMovimientoActualizar, DemoMovimientoCrear
 from app.repositories.sp_repository import sp_repo
 from app.services.demo_runner import demo_runner
@@ -8,7 +9,9 @@ router = APIRouter(tags=["Demos y secuencias"])
 
 
 @router.get("/vehiculos/{id_vehiculo}/demos")
-def listar_demos(id_vehiculo: int): return sp_repo.sp_obtener_demos(id_vehiculo)
+def listar_demos(id_vehiculo: int, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
+    return sp_repo.sp_obtener_demos(id_vehiculo)
 
 
 @router.post("/demos", status_code=201)
@@ -49,7 +52,10 @@ def eliminar_movimiento(id_movimiento: int):
 
 
 @router.post("/vehiculos/{id_vehiculo}/demos/{id_demo}/iniciar", status_code=202)
-async def iniciar_demo(id_vehiculo: int, id_demo: int):
+async def iniciar_demo(id_vehiculo: int, id_demo: int, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="OPERAR")
+    if user.get("rol") == "INVITADO":
+        raise HTTPException(403, "El modo Invitado no permite ejecutar secuencias DEMO completas")
     if demo_runner.is_running(id_vehiculo):
         raise HTTPException(409, "Ya existe una demo en ejecución para este vehículo")
     movimientos = sp_repo.sp_obtener_movimientos_demo(id_demo)
@@ -60,7 +66,8 @@ async def iniciar_demo(id_vehiculo: int, id_demo: int):
 
 
 @router.post("/vehiculos/{id_vehiculo}/demos/cancelar")
-def cancelar_demo(id_vehiculo: int):
+def cancelar_demo(id_vehiculo: int, user: dict = Depends(get_current_user)):
+    verificar_autorizacion_vehiculo(user, id_vehiculo, modo="OPERAR", comando_codigo=9)
     if not demo_runner.cancel_demo(id_vehiculo):
         raise HTTPException(400, "No hay ninguna demo activa para este vehículo")
     return {"mensaje": "Señal de cancelación enviada"}

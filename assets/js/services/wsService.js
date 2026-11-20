@@ -1,8 +1,9 @@
 /**
- * wsService.js - Gestor de sesión WebSocket WSS nativo para el navegador
+ * wsService.js - Gestor de sesión WebSocket WSS autenticado y dinámico por vehículo.
+ * Evita conexiones duplicadas y cancela suscripciones al cambiar de unidad o cerrar sesión.
  */
 
-import { CONFIG } from "../config.js";
+import { CONFIG } from "../config.js?v=20261119b";
 
 export const WsState = {
   CONNECTING: "CONNECTING",
@@ -17,6 +18,9 @@ class WebSocketService {
     this.reconnectTimer = null;
     this.listeners = new Set();
     this.stateChangeListeners = new Set();
+    this.currentVehicleId = null;
+    this.currentToken = null;
+    this.manualDisconnect = false;
   }
 
   onMessage(callback) {
@@ -37,15 +41,36 @@ class WebSocketService {
     }
   }
 
-  connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+  connect(vehicleId = this.currentVehicleId, token = this.currentToken) {
+    if (!vehicleId || !token) {
+      this.disconnect();
       return;
     }
 
+    // Si cambia de vehículo o token, cerrar la conexión previa limpiamente
+    if (
+      this.ws &&
+      (this.currentVehicleId !== vehicleId || this.currentToken !== token)
+    ) {
+      this.disconnect();
+    }
+
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
+    this.currentVehicleId = vehicleId;
+    this.currentToken = token;
+    this.manualDisconnect = false;
     this._setState(WsState.CONNECTING);
 
+    const url = `${CONFIG.WS_BASE_URL}/${vehicleId}?token=${encodeURIComponent(token)}`;
+
     try {
-      this.ws = new WebSocket(CONFIG.WS_URL);
+      this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
         this._setState(WsState.ONLINE);
@@ -68,9 +93,12 @@ class WebSocketService {
         this._setState(WsState.DISCONNECTED);
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (ev) => {
         this._setState(WsState.DISCONNECTED);
-        this._scheduleReconnect();
+        // No reconectar si fue cierre manual o rechazo de autorización (4001/4003)
+        if (!this.manualDisconnect && ev.code !== 4001 && ev.code !== 4003) {
+          this._scheduleReconnect();
+        }
       };
     } catch {
       this._setState(WsState.DISCONNECTED);
@@ -79,21 +107,27 @@ class WebSocketService {
   }
 
   _scheduleReconnect() {
-    if (!this.reconnectTimer) {
+    if (!this.reconnectTimer && !this.manualDisconnect && this.currentVehicleId && this.currentToken) {
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
-        this.connect();
+        this.connect(this.currentVehicleId, this.currentToken);
       }, CONFIG.WS_RECONNECT_INTERVAL_MS);
     }
   }
 
   disconnect() {
+    this.manualDisconnect = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch {
+        // ignore
+      }
       this.ws = null;
     }
     this._setState(WsState.DISCONNECTED);
@@ -101,4 +135,3 @@ class WebSocketService {
 }
 
 export const wsService = new WebSocketService();
-
