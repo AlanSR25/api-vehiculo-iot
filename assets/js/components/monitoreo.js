@@ -5,7 +5,7 @@
  * - Regla estricta: MOVIMIENTO_DEMO actualiza la tarjeta en vivo pero NO contamina la tabla individual.
  */
 
-import { apiService } from "../services/apiService.js?v=20261119b";
+import { apiService } from "../services/apiService.js?v=20261123b";
 
 export function formatearFechaHora(fechaStr) {
   if (!fechaStr) return { fecha: "--", hora: "--" };

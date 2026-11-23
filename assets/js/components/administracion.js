@@ -5,8 +5,8 @@
  * - INVITADO: "Prueba nuestros vehículos IoT" (Catálogo público y reserva exclusiva temporal).
  */
 
-import { apiService } from "../services/apiService.js?v=20261119b";
-import { formatearFechaHora } from "./monitoreo.js?v=20261119b";
+import { apiService } from "../services/apiService.js?v=20261123b";
+import { formatearFechaHora } from "./monitoreo.js?v=20261123b";
 
 function escapeHtml(str) {
   return String(str ?? "")

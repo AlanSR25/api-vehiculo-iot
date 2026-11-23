@@ -3,7 +3,7 @@
  * Usa sessionStorage para permitir pruebas multi-pestaña (Admin, Usuario e Invitado en paralelo).
  */
 
-import { CONFIG } from "../config.js?v=20261119b";
+import { CONFIG } from "../config.js?v=20261123b";
 
 const TOKEN_KEY = "iot_43_jwt_token";
 const USER_KEY = "iot_43_user_profile";

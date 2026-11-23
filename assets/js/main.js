@@ -6,13 +6,13 @@
  * - Reserva temporal de Invitado con cuenta regresiva y detención segura automática.
  */
 
-import { CONFIG } from "./config.js?v=20261119b";
-import { apiService } from "./services/apiService.js?v=20261119b";
-import { wsService, WsState } from "./services/wsService.js?v=20261119b";
-import { appState } from "./state/appState.js?v=20261119b";
-import { VirtualJoystick } from "./components/joystick.js?v=20261119b";
-import { monitoreoManager } from "./components/monitoreo.js?v=20261119b";
-import { administracionManager } from "./components/administracion.js?v=20261119b";
+import { CONFIG } from "./config.js?v=20261123b";
+import { apiService } from "./services/apiService.js?v=20261123b";
+import { wsService, WsState } from "./services/wsService.js?v=20261123b";
+import { appState } from "./state/appState.js?v=20261123b";
+import { VirtualJoystick } from "./components/joystick.js?v=20261123b";
+import { monitoreoManager } from "./components/monitoreo.js?v=20261123b";
+import { administracionManager } from "./components/administracion.js?v=20261123b";
 
 const COMANDO_MAP = {
   AVANZAR: 1,
@@ -340,8 +340,28 @@ async function cambiarVehiculoActivo(vehicleId, vehicleName) {
 
   await Promise.all([
     monitoreoManager.cargarDatosCompletos().catch(() => null),
+    adaptarBotonesPorCapacidad(activeVehicleId),
     currentUser?.rol !== "INVITADO" ? cargarDemosVehiculo(activeVehicleId) : Promise.resolve(),
   ]);
+}
+
+async function adaptarBotonesPorCapacidad(vehicleId) {
+  if (currentUser?.rol === "INVITADO") {
+    aplicarRestriccionesControles("INVITADO");
+    return;
+  }
+  try {
+    const cmds = await apiService.getComandos(vehicleId);
+    const codigosActivos = new Set((cmds || []).filter((c) => c.activo).map((c) => Number(c.codigo)));
+    if (codigosActivos.size > 0) {
+      if (dom.btnSubir) dom.btnSubir.disabled = !codigosActivos.has(5);
+      if (dom.btnBajar) dom.btnBajar.disabled = !codigosActivos.has(6);
+      if (dom.btnLuz) dom.btnLuz.disabled = !codigosActivos.has(7);
+      if (dom.btnGrabar) dom.btnGrabar.disabled = !codigosActivos.has(8);
+    }
+  } catch {
+    // conservar estado actual
+  }
 }
 
 async function cargarDemosVehiculo(vehicleId) {
