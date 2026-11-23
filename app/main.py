@@ -81,9 +81,19 @@ def health():
 async def websocket_vehiculo(websocket: WebSocket, id_vehiculo: int):
     token = websocket.query_params.get("token")
     device = websocket.query_params.get("device")
+    origin = websocket.headers.get("origin")
+    user_agent = (websocket.headers.get("user-agent") or "").lower()
 
-    # Autorización estricta de canal WSS (evita fuga de eventos entre usuarios)
-    if device != "esp32":
+    # Permitir conexión directa al microcontrolador físico ESP32/Arduino (no envía header Origin)
+    es_esp32 = (
+        device == "esp32"
+        or "arduino" in user_agent
+        or "esp32" in user_agent
+        or (origin is None and token is None and id_vehiculo == 1)
+    )
+
+    # Autorización estricta de canal WSS para navegadores y clientes con token
+    if not es_esp32:
         if not token:
             await websocket.close(code=4001, reason="Autenticacion WSS requerida")
             return

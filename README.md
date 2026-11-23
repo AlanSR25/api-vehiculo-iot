@@ -11,10 +11,10 @@
 ## 1. Enlaces Públicos y Contratos Activos
 
 * **Frontend Integrado (Control + Monitoreo + Administración)**: `https://alansr25.github.io/api-vehiculo-iot/`
-* **Base API HTTPS (Cloudflare TLS)**: `https://alleged-radio-preparing-actress.trycloudflare.com`
-* **Documentación Swagger / OpenAPI**: `https://alleged-radio-preparing-actress.trycloudflare.com/docs`
-* **Canal WebSocket Seguro Autenticado (WSS)**: `wss://alleged-radio-preparing-actress.trycloudflare.com/ws/vehiculo/{id_vehiculo}?token={jwt}`
-* **Diagnóstico de Salud (API + RDS)**: `https://alleged-radio-preparing-actress.trycloudflare.com/health`
+* **Base API HTTPS (Cloudflare TLS)**: `https://floyd-behavior-kong-singles.trycloudflare.com`
+* **Documentación Swagger / OpenAPI**: `https://floyd-behavior-kong-singles.trycloudflare.com/docs`
+* **Canal WebSocket Seguro Autenticado (WSS)**: `wss://floyd-behavior-kong-singles.trycloudflare.com/ws/vehiculo/{id_vehiculo}?token={jwt}`
+* **Diagnóstico de Salud (API + RDS)**: `https://floyd-behavior-kong-singles.trycloudflare.com/health`
 
 ---
 
