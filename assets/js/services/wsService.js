@@ -3,7 +3,7 @@
  * Evita conexiones duplicadas y cancela suscripciones al cambiar de unidad o cerrar sesión.
  */
 
-import { CONFIG } from "../config.js?v=20261123b";
+import { CONFIG } from "../config.js?v=20261123c";
 
 export const WsState = {
   CONNECTING: "CONNECTING",
@@ -16,6 +16,7 @@ class WebSocketService {
     this.ws = null;
     this.state = WsState.DISCONNECTED;
     this.reconnectTimer = null;
+    this.pingTimer = null;
     this.listeners = new Set();
     this.stateChangeListeners = new Set();
     this.currentVehicleId = null;
@@ -39,6 +40,39 @@ class WebSocketService {
       this.state = newState;
       this.stateChangeListeners.forEach((cb) => cb(newState));
     }
+  }
+
+  _startPing() {
+    this._stopPing();
+    this.pingTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({ tipo: "PING", ts: Date.now() }));
+        } catch {
+          // ignore
+        }
+      }
+    }, 12000);
+  }
+
+  _stopPing() {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+  }
+
+  send(data) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        const text = typeof data === "string" ? data : JSON.stringify(data);
+        this.ws.send(text);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   }
 
   connect(vehicleId = this.currentVehicleId, token = this.currentToken) {
@@ -78,11 +112,16 @@ class WebSocketService {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+        this._startPing();
       };
 
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Si es un Heartbeat de mantenimiento, solo confirmar actividad
+          if (data && data.evento === "HEARTBEAT") {
+            return;
+          }
           this.listeners.forEach((cb) => cb(data));
         } catch {
           // Mensaje no JSON
@@ -94,6 +133,7 @@ class WebSocketService {
       };
 
       this.ws.onclose = (ev) => {
+        this._stopPing();
         this._setState(WsState.DISCONNECTED);
         // No reconectar si fue cierre manual o rechazo de autorización (4001/4003)
         if (!this.manualDisconnect && ev.code !== 4001 && ev.code !== 4003) {
@@ -101,6 +141,7 @@ class WebSocketService {
         }
       };
     } catch {
+      this._stopPing();
       this._setState(WsState.DISCONNECTED);
       this._scheduleReconnect();
     }
@@ -111,12 +152,13 @@ class WebSocketService {
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
         this.connect(this.currentVehicleId, this.currentToken);
-      }, CONFIG.WS_RECONNECT_INTERVAL_MS);
+      }, 1200);
     }
   }
 
   disconnect() {
     this.manualDisconnect = true;
+    this._stopPing();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

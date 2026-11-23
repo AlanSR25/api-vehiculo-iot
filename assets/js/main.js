@@ -6,13 +6,13 @@
  * - Reserva temporal de Invitado con cuenta regresiva y detención segura automática.
  */
 
-import { CONFIG } from "./config.js?v=20261123b";
-import { apiService } from "./services/apiService.js?v=20261123b";
-import { wsService, WsState } from "./services/wsService.js?v=20261123b";
-import { appState } from "./state/appState.js?v=20261123b";
-import { VirtualJoystick } from "./components/joystick.js?v=20261123b";
-import { monitoreoManager } from "./components/monitoreo.js?v=20261123b";
-import { administracionManager } from "./components/administracion.js?v=20261123b";
+import { CONFIG } from "./config.js?v=20261123c";
+import { apiService } from "./services/apiService.js?v=20261123c";
+import { wsService, WsState } from "./services/wsService.js?v=20261123c";
+import { appState } from "./state/appState.js?v=20261123c";
+import { VirtualJoystick } from "./components/joystick.js?v=20261123c";
+import { monitoreoManager } from "./components/monitoreo.js?v=20261123c";
+import { administracionManager } from "./components/administracion.js?v=20261123c";
 
 const COMANDO_MAP = {
   AVANZAR: 1,
@@ -482,6 +482,8 @@ function bindButtons() {
   });
 }
 
+let ultimoComandoTs = 0;
+
 async function ejecutarComando(codigo, origen = "FRONTEND-WEB") {
   if (!apiService.getToken()) {
     actualizarLog(`Comando ${codigo}`, "401 Sin sesión", "Inicia sesión");
@@ -489,15 +491,25 @@ async function ejecutarComando(codigo, origen = "FRONTEND-WEB") {
     return;
   }
 
+  const esDetener = codigo === 9 || codigo === COMANDO_MAP.DETENER;
+  const ahora = Date.now();
+
+  // Throttling de 120ms para giros/movimientos repetidos de joystick
+  // DETENER (9) NUNCA se restringe; pasa con prioridad máxima inmediata
+  if (!esDetener && ahora - ultimoComandoTs < 120) {
+    return;
+  }
+  ultimoComandoTs = ahora;
+
   appState.ultimaAccion.solicitada = `Comando ${codigo} (${origen})`;
-  actualizarLog(`U#${activeVehicleId} Cmd ${codigo}`, "Enviando POST...", "Pendiente WSS...");
+  actualizarLog(`U#${activeVehicleId} Cmd ${codigo}`, "Enviando...", "Pendiente WSS...");
 
   try {
     const res = await apiService.enviarMovimiento(codigo, activeVehicleId, origen);
     actualizarLog(
       `U#${activeVehicleId} [${res.comando || "OK"}]`,
       "HTTP 200 Aceptado",
-      appState.ultimaAccion.eventoWs || "Esperando WSS..."
+      appState.ultimaAccion.eventoWs || "WSS Activo"
     );
   } catch (err) {
     actualizarLog(`U#${activeVehicleId} Cmd ${codigo}`, `Error ${err.status || ""}: ${err.message}`, "Rechazado");

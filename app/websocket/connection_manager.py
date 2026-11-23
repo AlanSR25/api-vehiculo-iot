@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 
 from fastapi import WebSocket
@@ -34,7 +35,7 @@ class WebSocketConnectionManager:
         dead = []
         for connection in destinatarios:
             try:
-                await connection.send_json(jsonable_encoder(message))
+                await asyncio.wait_for(connection.send_json(jsonable_encoder(message)), timeout=1.2)
             except Exception:
                 dead.append(connection)
         for connection in dead:

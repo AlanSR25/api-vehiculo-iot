@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +15,8 @@ router = APIRouter(tags=["Estado e historial"])
 # Secuencia en memoria RAM para reproducción rápida (botón 8)
 secuencias_usuario: dict[int, list[dict]] = {}
 secuencias_reproduciendo: dict[int, asyncio.Task] = {}
+_cache_vehiculo_comandos: dict[int, tuple[float, list[dict], list[dict]]] = {}
+CACHE_TTL_SECS = 45.0
 
 
 async def _reproducir_secuencia_en_ram(vehiculo_id: int, pasos: list[dict]):
@@ -76,10 +79,18 @@ def obtener_historial(id_vehiculo: int, user: dict = Depends(get_current_user)):
 @router.post("/vehiculos/{id_vehiculo}/movimiento")
 async def ejecutar_movimiento(id_vehiculo: int, datos: MovimientoIndividual, user: dict = Depends(get_current_user)):
     verificar_autorizacion_vehiculo(user, id_vehiculo, modo="VER")
-    vehiculos, comandos = await asyncio.gather(
-        asyncio.to_thread(sp_repo.sp_obtener_vehiculo, id_vehiculo),
-        asyncio.to_thread(sp_repo.sp_obtener_comandos_vehiculo, id_vehiculo),
-    )
+    ahora_ts = time.time()
+    cache_item = _cache_vehiculo_comandos.get(id_vehiculo)
+    if cache_item and (ahora_ts - cache_item[0] < CACHE_TTL_SECS):
+        vehiculos, comandos = cache_item[1], cache_item[2]
+    else:
+        vehiculos, comandos = await asyncio.gather(
+            asyncio.to_thread(sp_repo.sp_obtener_vehiculo, id_vehiculo),
+            asyncio.to_thread(sp_repo.sp_obtener_comandos_vehiculo, id_vehiculo),
+        )
+        if vehiculos and vehiculos[0].get("activo"):
+            _cache_vehiculo_comandos[id_vehiculo] = (ahora_ts, vehiculos, comandos)
+
     if not vehiculos or not vehiculos[0].get("activo"):
         raise HTTPException(404, "Vehículo no encontrado o inactivo")
 
