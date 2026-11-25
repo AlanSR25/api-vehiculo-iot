@@ -13,9 +13,9 @@
 * **15.2 URL del Repositorio Original Actualizado**:  
   `https://github.com/AlanSR25/api-vehiculo-iot`
 * **15.2 URL de Documentación Swagger / OpenAPI (`/docs`)**:  
-  `https://floyd-behavior-kong-singles.trycloudflare.com/docs`
+  `https://platinum-nissan-orlando-proved.trycloudflare.com/docs`
 * **15.2 Diagnóstico de Salud (`/health`)**:  
-  `https://floyd-behavior-kong-singles.trycloudflare.com/health`
+  `https://platinum-nissan-orlando-proved.trycloudflare.com/health`
 * **15.2 Suite Automatizada de Pruebas (P01–P17)**:  
   [`tests/test_seguridad_4_3.py`](tests/test_seguridad_4_3.py)
 

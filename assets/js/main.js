@@ -6,13 +6,13 @@
  * - Reserva temporal de Invitado con cuenta regresiva y detención segura automática.
  */
 
-import { CONFIG } from "./config.js?v=20261123c";
-import { apiService } from "./services/apiService.js?v=20261123c";
-import { wsService, WsState } from "./services/wsService.js?v=20261123c";
-import { appState } from "./state/appState.js?v=20261123c";
-import { VirtualJoystick } from "./components/joystick.js?v=20261123c";
-import { monitoreoManager } from "./components/monitoreo.js?v=20261123c";
-import { administracionManager } from "./components/administracion.js?v=20261123c";
+import { CONFIG } from "./config.js?v=20261125a";
+import { apiService } from "./services/apiService.js?v=20261125a";
+import { wsService, WsState } from "./services/wsService.js?v=20261125a";
+import { appState } from "./state/appState.js?v=20261125a";
+import { VirtualJoystick } from "./components/joystick.js?v=20261125a";
+import { monitoreoManager } from "./components/monitoreo.js?v=20261125a";
+import { administracionManager } from "./components/administracion.js?v=20261125a";
 
 const COMANDO_MAP = {
   AVANZAR: 1,

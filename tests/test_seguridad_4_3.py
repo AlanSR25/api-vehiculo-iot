@@ -9,7 +9,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE = "https://floyd-behavior-kong-singles.trycloudflare.com"
+BASE = "https://platinum-nissan-orlando-proved.trycloudflare.com"
 
 
 def req(method: str, path: str, body=None, token: str = None):

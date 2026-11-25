@@ -11,10 +11,10 @@
 ## 1. Enlaces Públicos y Contratos Activos
 
 * **Frontend Integrado (Control + Monitoreo + Administración)**: `https://alansr25.github.io/api-vehiculo-iot/`
-* **Base API HTTPS (Cloudflare TLS)**: `https://floyd-behavior-kong-singles.trycloudflare.com`
-* **Documentación Swagger / OpenAPI**: `https://floyd-behavior-kong-singles.trycloudflare.com/docs`
-* **Canal WebSocket Seguro Autenticado (WSS)**: `wss://floyd-behavior-kong-singles.trycloudflare.com/ws/vehiculo/{id_vehiculo}?token={jwt}`
-* **Diagnóstico de Salud (API + RDS)**: `https://floyd-behavior-kong-singles.trycloudflare.com/health`
+* **Base API HTTPS (Cloudflare TLS)**: `https://platinum-nissan-orlando-proved.trycloudflare.com`
+* **Documentación Swagger / OpenAPI**: `https://platinum-nissan-orlando-proved.trycloudflare.com/docs`
+* **Canal WebSocket Seguro Autenticado (WSS)**: `wss://platinum-nissan-orlando-proved.trycloudflare.com/ws/vehiculo/{id_vehiculo}?token={jwt}`
+* **Diagnóstico de Salud (API + RDS)**: `https://platinum-nissan-orlando-proved.trycloudflare.com/health`
 
 ---
 

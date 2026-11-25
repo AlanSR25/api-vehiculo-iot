@@ -3,7 +3,7 @@
  * Evita conexiones duplicadas y cancela suscripciones al cambiar de unidad o cerrar sesión.
  */
 
-import { CONFIG } from "../config.js?v=20261123c";
+import { CONFIG } from "../config.js?v=20261125a";
 
 export const WsState = {
   CONNECTING: "CONNECTING",

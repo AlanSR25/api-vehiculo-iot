@@ -3,7 +3,7 @@
  * Compatible con GitHub Pages (sin secretos incrustados)
  */
 
-const BASE_HOST = "floyd-behavior-kong-singles.trycloudflare.com";
+const BASE_HOST = "platinum-nissan-orlando-proved.trycloudflare.com";
 
 export const CONFIG = {
   // URL base HTTPS con certificado SSL oficial de confianza mundial (Cloudflare)
