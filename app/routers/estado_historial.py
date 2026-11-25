@@ -19,6 +19,10 @@ _cache_vehiculo_comandos: dict[int, tuple[float, list[dict], list[dict]]] = {}
 CACHE_TTL_SECS = 45.0
 
 
+def invalidar_cache_vehiculo(id_vehiculo: int) -> None:
+    _cache_vehiculo_comandos.pop(id_vehiculo, None)
+
+
 async def _reproducir_secuencia_en_ram(vehiculo_id: int, pasos: list[dict]):
     try:
         await ws_manager.broadcast_to_vehiculo(vehiculo_id, {

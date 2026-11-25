@@ -40,6 +40,7 @@ export const CONFIG = {
     ADMIN_MODELO: (id) => `/admin/modelos/${id}`,
     ADMIN_UNIDADES: "/admin/unidades",
     ADMIN_UNIDAD: (id) => `/admin/unidades/${id}`,
+    ADMIN_UNIDAD_COMANDOS: (id) => `/admin/unidades/${id}/comandos`,
     ADMIN_ASIGNAR: (id) => `/admin/unidades/${id}/asignar`,
     ADMIN_CLIENTES: "/admin/clientes",
     ADMIN_CLIENTE: (id) => `/admin/clientes/${id}`,

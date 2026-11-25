@@ -5,8 +5,8 @@
  * - INVITADO: "Prueba nuestros vehículos IoT" (Catálogo público y reserva exclusiva temporal).
  */
 
-import { apiService } from "../services/apiService.js?v=20261125a";
-import { formatearFechaHora } from "./monitoreo.js?v=20261125a";
+import { apiService } from "../services/apiService.js?v=20261125b";
+import { formatearFechaHora } from "./monitoreo.js?v=20261125b";
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -21,6 +21,9 @@ class AdministracionManager {
     this.onSelectVehicle = null;
     this.onGuestSessionStarted = null;
     this.onDemosChanged = null;
+    this.onUnitCommandsUpdated = null;
+    this.modalComandosUnidad = null;
+    this.comandosEditandoVehiculoId = null;
 
     this.modelosCache = [];
     this.clientesCache = [];
@@ -86,7 +89,17 @@ class AdministracionManager {
       catalogoExhibicionGrid: document.getElementById("catalogoExhibicionGrid"),
       inputNombreInvitado: document.getElementById("inputNombreInvitado"),
       btnRefrescarCatalogo: document.getElementById("btnRefrescarCatalogo"),
+
+      // Modal Editar Comandos por Unidad
+      modalComandosEl: document.getElementById("modalComandosUnidad"),
+      modalComandosSubtitulo: document.getElementById("modalComandosUnidadSubtitulo"),
+      modalComandosLista: document.getElementById("modalComandosLista"),
+      btnGuardarComandosUnidad: document.getElementById("btnGuardarComandosUnidad"),
     };
+
+    if (this.dom.modalComandosEl && window.bootstrap?.Modal) {
+      this.modalComandosUnidad = new window.bootstrap.Modal(this.dom.modalComandosEl);
+    }
 
     this._bindEvents();
   }
@@ -237,6 +250,23 @@ class AdministracionManager {
         this.showFeedback(`Error al guardar DEMO: ${err.message}`, "danger");
       }
     });
+
+    // Guardar Comandos Habilitados / Bloqueados de una Unidad Física
+    this.dom.btnGuardarComandosUnidad?.addEventListener("click", async () => {
+      if (!this.comandosEditandoVehiculoId || !this.dom.modalComandosLista) return;
+      const checks = this.dom.modalComandosLista.querySelectorAll(".check-comando-unidad:checked");
+      const codigos = Array.from(checks).map((el) => Number(el.value));
+      if (!codigos.includes(9)) codigos.push(9);
+      try {
+        await apiService.actualizarComandosUnidadAdmin(this.comandosEditandoVehiculoId, codigos);
+        this.modalComandosUnidad?.hide();
+        this.showFeedback(`Movimientos de Unidad #${this.comandosEditandoVehiculoId} actualizados en RDS.`, "success");
+        if (this.onUnitCommandsUpdated) this.onUnitCommandsUpdated(this.comandosEditandoVehiculoId);
+        await this.cargarAdminCompleto();
+      } catch (err) {
+        this.showFeedback(`Error al actualizar movimientos: ${err.message}`, "danger");
+      }
+    });
   }
 
   async renderPorRol(user, activeVehicleId = null) {
@@ -381,6 +411,9 @@ class AdministracionManager {
           <td><span class="badge bg-dark border border-secondary">${u.total_historial || 0} movs</span></td>
           <td>
             <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-warning btn-editar-comandos" data-id="${u.id_vehiculo}" data-nombre="${escapeHtml(u.nombre)}" title="Editar / bloquear movimientos">
+                <i class="bi bi-sliders"></i>
+              </button>
               <button class="btn btn-sm btn-outline-info btn-operar-unidad" data-id="${u.id_vehiculo}" data-nombre="${escapeHtml(u.nombre)}" title="Seleccionar en Control/Monitoreo">
                 <i class="bi bi-controller"></i>
               </button>
@@ -428,6 +461,47 @@ class AdministracionManager {
         if (this.onSelectVehicle) this.onSelectVehicle(Number(btn.dataset.id), btn.dataset.nombre, true);
       });
     });
+
+    this.dom.tbodyUnidades.querySelectorAll(".btn-editar-comandos").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        const nombre = btn.dataset.nombre || `Unidad #${id}`;
+        await this.abrirModalComandosUnidad(id, nombre);
+      });
+    });
+  }
+
+  async abrirModalComandosUnidad(idVehiculo, nombreUnidad) {
+    if (!this.dom.modalComandosLista) return;
+    this.comandosEditandoVehiculoId = idVehiculo;
+    if (this.dom.modalComandosSubtitulo) {
+      this.dom.modalComandosSubtitulo.textContent = `Unidad #${idVehiculo} (${nombreUnidad}): marca los movimientos permitidos o desmarca para bloquear.`;
+    }
+    this.dom.modalComandosLista.innerHTML = `<div class="text-center text-secondary py-3 small">Cargando comandos desde RDS...</div>`;
+    this.modalComandosUnidad?.show();
+
+    try {
+      const data = await apiService.getComandosUnidadAdmin(idVehiculo);
+      const comandos = data?.comandos || [];
+      this.dom.modalComandosLista.innerHTML = comandos
+        .map((c) => {
+          const esDetener = Number(c.codigo) === 9;
+          return `
+          <label class="d-flex justify-content-between align-items-center p-2 rounded bg-black bg-opacity-25 border border-secondary-subtle">
+            <div>
+              <span class="badge ${c.activo ? "bg-success" : "bg-secondary"} me-2">#${c.codigo}</span>
+              <strong class="text-white small">${escapeHtml(c.nombre)}</strong>
+              <small class="text-secondary d-block ms-4">${escapeHtml(c.descripcion || "")}</small>
+            </div>
+            <div class="form-check form-switch m-0">
+              <input class="form-check-input check-comando-unidad" type="checkbox" value="${c.codigo}" ${c.activo || esDetener ? "checked" : ""} ${esDetener ? "disabled" : ""}>
+            </div>
+          </label>`;
+        })
+        .join("");
+    } catch (err) {
+      this.dom.modalComandosLista.innerHTML = `<div class="alert alert-danger py-2 small mb-0">Error al cargar comandos: ${escapeHtml(err.message)}</div>`;
+    }
   }
 
   _renderTablaClientes() {

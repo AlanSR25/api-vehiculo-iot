@@ -307,6 +307,85 @@ class AdminRepository:
     def set_soporte_autorizado(self, id_vehiculo: int, autorizado: bool):
         self._execute("UPDATE vehiculos SET soporte_autorizado=%s WHERE id_vehiculo=%s", (int(autorizado), id_vehiculo))
 
+    def list_comandos_unidad_admin(self, id_vehiculo: int):
+        catalogo = {
+            1: ("AVANZAR", "Avanzar"),
+            2: ("RETROCEDER", "Retroceder"),
+            3: ("GIRAR_IZQUIERDA", "Girar Izquierda"),
+            4: ("GIRAR_DERECHA", "Girar Derecha"),
+            5: ("SUBIR_BRAZO", "Subir Brazo"),
+            6: ("BAJAR_BRAZO", "Bajar Brazo"),
+            7: ("LUZ", "Luces On/Off"),
+            8: ("GRABAR_SECUENCIA", "Grabar/Reproducir secuencia RAM"),
+            9: ("DETENER", "Detener / Parada segura"),
+        }
+        existentes = self._query(
+            "SELECT id_comando, codigo, nombre, descripcion, activo FROM comandos WHERE id_vehiculo = %s ORDER BY codigo ASC",
+            (id_vehiculo,),
+        )
+        por_codigo = {int(c["codigo"]): c for c in existentes if c.get("codigo") is not None}
+        resultado = []
+        for cod in range(1, 10):
+            if cod in por_codigo:
+                c = por_codigo[cod]
+                resultado.append({
+                    "id_comando": c["id_comando"],
+                    "codigo": cod,
+                    "nombre": c["nombre"],
+                    "descripcion": c.get("descripcion") or catalogo[cod][1],
+                    "activo": bool(c.get("activo")),
+                })
+            else:
+                resultado.append({
+                    "id_comando": None,
+                    "codigo": cod,
+                    "nombre": catalogo[cod][0],
+                    "descripcion": catalogo[cod][1],
+                    "activo": False,
+                })
+        return resultado
+
+    def actualizar_comandos_unidad(self, id_vehiculo: int, codigos_habilitados: list[int]):
+        catalogo = {
+            1: ("AVANZAR", "Avanzar"),
+            2: ("RETROCEDER", "Retroceder"),
+            3: ("GIRAR_IZQUIERDA", "Girar Izquierda"),
+            4: ("GIRAR_DERECHA", "Girar Derecha"),
+            5: ("SUBIR_BRAZO", "Subir Brazo"),
+            6: ("BAJAR_BRAZO", "Bajar Brazo"),
+            7: ("LUZ", "Luces On/Off"),
+            8: ("GRABAR_SECUENCIA", "Grabar/Reproducir secuencia RAM"),
+            9: ("DETENER", "Detener / Parada segura"),
+        }
+        habilitados = {int(c) for c in codigos_habilitados if 1 <= int(c) <= 9}
+        # Regla de seguridad física: DETENER (9) siempre debe permanecer activo
+        habilitados.add(9)
+
+        conn = db_manager.get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute("SELECT id_comando, codigo FROM comandos WHERE id_vehiculo = %s", (id_vehiculo,))
+            existentes = {int(r["codigo"]): r["id_comando"] for r in cur.fetchall() if r.get("codigo") is not None}
+
+            for cod in range(1, 10):
+                activo = 1 if cod in habilitados else 0
+                if cod in existentes:
+                    cur.execute("UPDATE comandos SET activo = %s WHERE id_comando = %s", (activo, existentes[cod]))
+                elif activo == 1:
+                    nom, desc = catalogo[cod]
+                    cur.execute(
+                        "INSERT INTO comandos (id_vehiculo, nombre, codigo, descripcion, activo) VALUES (%s, %s, %s, %s, 1)",
+                        (id_vehiculo, nom, cod, desc),
+                    )
+            conn.commit()
+            return sorted(habilitados)
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+            conn.close()
+
     # =========================================================================
     # DASHBOARD METRICAS REALES
     # =========================================================================

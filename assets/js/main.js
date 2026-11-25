@@ -6,13 +6,13 @@
  * - Reserva temporal de Invitado con cuenta regresiva y detención segura automática.
  */
 
-import { CONFIG } from "./config.js?v=20261125a";
-import { apiService } from "./services/apiService.js?v=20261125a";
-import { wsService, WsState } from "./services/wsService.js?v=20261125a";
-import { appState } from "./state/appState.js?v=20261125a";
-import { VirtualJoystick } from "./components/joystick.js?v=20261125a";
-import { monitoreoManager } from "./components/monitoreo.js?v=20261125a";
-import { administracionManager } from "./components/administracion.js?v=20261125a";
+import { CONFIG } from "./config.js?v=20261125b";
+import { apiService } from "./services/apiService.js?v=20261125b";
+import { wsService, WsState } from "./services/wsService.js?v=20261125b";
+import { appState } from "./state/appState.js?v=20261125b";
+import { VirtualJoystick } from "./components/joystick.js?v=20261125b";
+import { monitoreoManager } from "./components/monitoreo.js?v=20261125b";
+import { administracionManager } from "./components/administracion.js?v=20261125b";
 
 const COMANDO_MAP = {
   AVANZAR: 1,
@@ -31,6 +31,7 @@ let currentUser = null;
 let activeVehicleId = CONFIG.VEHICLE_ID;
 let activeVehicleName = "Excavadora IoT";
 let guestTimerInterval = null;
+let comandosActivosUnidad = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 let guestSecondsLeft = 0;
 let loginModal = null;
 
@@ -112,6 +113,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   administracionManager.onSelectVehicle = async (id, nombre, goToControl) => {
     await cambiarVehiculoActivo(id, nombre);
     if (goToControl) activarPestana("CONTROL");
+  };
+
+  administracionManager.onUnitCommandsUpdated = async (id) => {
+    if (Number(id) === Number(activeVehicleId)) {
+      await adaptarBotonesPorCapacidad(activeVehicleId);
+    }
   };
 
   administracionManager.onGuestSessionStarted = async (sesion) => {
@@ -347,12 +354,14 @@ async function cambiarVehiculoActivo(vehicleId, vehicleName) {
 
 async function adaptarBotonesPorCapacidad(vehicleId) {
   if (currentUser?.rol === "INVITADO") {
+    comandosActivosUnidad = new Set([1, 2, 3, 4, 7, 9]);
     aplicarRestriccionesControles("INVITADO");
     return;
   }
   try {
     const cmds = await apiService.getComandos(vehicleId);
     const codigosActivos = new Set((cmds || []).filter((c) => c.activo).map((c) => Number(c.codigo)));
+    comandosActivosUnidad = codigosActivos;
     if (codigosActivos.size > 0) {
       if (dom.btnSubir) dom.btnSubir.disabled = !codigosActivos.has(5);
       if (dom.btnBajar) dom.btnBajar.disabled = !codigosActivos.has(6);
@@ -492,6 +501,10 @@ async function ejecutarComando(codigo, origen = "FRONTEND-WEB") {
   }
 
   const esDetener = codigo === 9 || codigo === COMANDO_MAP.DETENER;
+  if (!esDetener && comandosActivosUnidad.size > 0 && !comandosActivosUnidad.has(Number(codigo))) {
+    actualizarLog(`U#${activeVehicleId} Cmd ${codigo}`, "Bloqueado por Administrador", "No permitido en esta unidad");
+    return;
+  }
   const ahora = Date.now();
 
   // Throttling de 120ms para giros/movimientos repetidos de joystick

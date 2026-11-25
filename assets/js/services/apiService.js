@@ -3,7 +3,7 @@
  * Usa sessionStorage para permitir pruebas multi-pestaña (Admin, Usuario e Invitado en paralelo).
  */
 
-import { CONFIG } from "../config.js?v=20261125a";
+import { CONFIG } from "../config.js?v=20261125b";
 
 const TOKEN_KEY = "iot_43_jwt_token";
 const USER_KEY = "iot_43_user_profile";
@@ -138,6 +138,15 @@ class ApiService {
   }
   async bajaLogicaUnidad(idVehiculo) {
     return this._request(CONFIG.ENDPOINTS.ADMIN_UNIDAD(idVehiculo), { method: "DELETE" });
+  }
+  async getComandosUnidadAdmin(idVehiculo) {
+    return this._request(CONFIG.ENDPOINTS.ADMIN_UNIDAD_COMANDOS(idVehiculo));
+  }
+  async actualizarComandosUnidadAdmin(idVehiculo, codigosHabilitados) {
+    return this._request(CONFIG.ENDPOINTS.ADMIN_UNIDAD_COMANDOS(idVehiculo), {
+      method: "PUT",
+      body: JSON.stringify({ codigos_habilitados: codigosHabilitados }),
+    });
   }
   async getClientes() { return this._request(CONFIG.ENDPOINTS.ADMIN_CLIENTES); }
   async crearCliente(payload) { return this._request(CONFIG.ENDPOINTS.ADMIN_CLIENTES, { method: "POST", body: JSON.stringify(payload) }); }

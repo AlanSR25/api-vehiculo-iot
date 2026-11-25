@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.core.security import get_current_user, hash_password, require_roles
 from app.repositories.admin_repository import admin_repo
+from app.routers.estado_historial import invalidar_cache_vehiculo
 from app.websocket.connection_manager import ws_manager
 
 router = APIRouter(tags=["Administración Comercial (4.3)"])
@@ -72,6 +73,10 @@ class ClienteActualizar(BaseModel):
 
 class SoporteAutorizarRequest(BaseModel):
     autorizado: bool
+
+
+class ComandosUnidadActualizar(BaseModel):
+    codigos_habilitados: list[int] = Field(default_factory=lambda: [1, 2, 3, 4, 7, 9])
 
 
 ESTADOS_VALIDOS = {"DISPONIBLE", "VENDIDO", "EXHIBICION", "MANTENIMIENTO", "INACTIVO"}
@@ -193,8 +198,44 @@ def baja_logica_unidad(id_vehiculo: int, user: dict = Depends(require_roles("ADM
         raise HTTPException(404, "Unidad no encontrada")
     # Regla 7.5: Prohibida eliminación destructiva con historial -> baja lógica
     admin_repo.update_unidad(id_vehiculo, unidad["nombre"], unidad.get("descripcion") or "", "INACTIVO", False)
+    invalidar_cache_vehiculo(id_vehiculo)
     admin_repo.auditar(user["id_usuario"], user["correo"], user["rol"], "BAJA_LOGICA_UNIDAD", f"vehiculo:{id_vehiculo}", "EXITO", "Desactivada conservando historial")
     return {"mensaje": "Unidad dada de baja lógicamente (historial preservado)"}
+
+
+@router.get("/admin/unidades/{id_vehiculo}/comandos")
+def listar_comandos_unidad(id_vehiculo: int, user: dict = Depends(require_roles("ADMIN"))):
+    unidad = admin_repo.get_unidad(id_vehiculo)
+    if not unidad:
+        raise HTTPException(404, "Unidad no encontrada")
+    return {
+        "id_vehiculo": id_vehiculo,
+        "nombre": unidad["nombre"],
+        "comandos": admin_repo.list_comandos_unidad_admin(id_vehiculo),
+    }
+
+
+@router.put("/admin/unidades/{id_vehiculo}/comandos")
+def actualizar_comandos_unidad(id_vehiculo: int, datos: ComandosUnidadActualizar, user: dict = Depends(require_roles("ADMIN"))):
+    unidad = admin_repo.get_unidad(id_vehiculo)
+    if not unidad:
+        raise HTTPException(404, "Unidad no encontrada")
+    habilitados = admin_repo.actualizar_comandos_unidad(id_vehiculo, datos.codigos_habilitados)
+    invalidar_cache_vehiculo(id_vehiculo)
+    admin_repo.auditar(
+        user["id_usuario"],
+        user["correo"],
+        user["rol"],
+        "ACTUALIZAR_COMANDOS_UNIDAD",
+        f"vehiculo:{id_vehiculo}",
+        "EXITO",
+        f"Comandos habilitados: {','.join(map(str, habilitados))}",
+    )
+    return {
+        "mensaje": "Comandos de la unidad actualizados correctamente",
+        "id_vehiculo": id_vehiculo,
+        "codigos_habilitados": habilitados,
+    }
 
 
 # =========================================================================
