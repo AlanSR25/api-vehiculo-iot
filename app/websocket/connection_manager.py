@@ -35,7 +35,13 @@ class WebSocketConnectionManager:
         dead = []
         for connection in destinatarios:
             try:
-                await asyncio.wait_for(connection.send_json(jsonable_encoder(message)), timeout=1.2)
+                payload = jsonable_encoder(message)
+                # Si el destinatario es el ESP32 en canal 1, asegurar id_vehiculo=1 para compatibilidad
+                if 1 in self.active_connections and connection in self.active_connections[1] and vehiculo_id != 1:
+                    if isinstance(payload, dict):
+                        payload = dict(payload)
+                        payload["id_vehiculo"] = 1
+                await asyncio.wait_for(connection.send_json(payload), timeout=1.2)
             except Exception:
                 dead.append(connection)
         for connection in dead:

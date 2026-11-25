@@ -112,16 +112,7 @@ async def websocket_vehiculo(websocket: WebSocket, id_vehiculo: int):
             "estado": estado[0] if estado else None, "timestamp": datetime.now(timezone.utc).isoformat(),
         }))
         while True:
-            try:
-                # Mantener el socket vivo con timeout de 15s.
-                # Si no hay tráfico, enviar HEARTBEAT para evitar desconexiones por inactividad de Cloudflare / ESP32.
-                await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
-            except asyncio.TimeoutError:
-                await websocket.send_json({
-                    "evento": "HEARTBEAT",
-                    "id_vehiculo": id_vehiculo,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                })
+            await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     except Exception:
